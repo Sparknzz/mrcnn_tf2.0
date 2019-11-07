@@ -1,8 +1,10 @@
 import tensorflow as tf
+from mrcnn.anchor import anchor_generator
+from mrcnn.anchor import anchor_target
 
 
 class RPN(tf.keras.Model):
-    def __init__(self, anchors_per_location, anchor_stride,
+    def __init__(self, anchor_scales, num_rpn_deltas,
                  anchor_ratios=(0.5, 1, 2),
                  target_means=(0., 0., 0., 0.),
                  target_stds=(0.1, 0.1, 0.2, 0.2),
@@ -21,14 +23,11 @@ class RPN(tf.keras.Model):
 
         Attributes
         ---
-            anchor_scales: 1D array of anchor sizes in pixels.
-            anchor_ratios: 1D array of anchor ratios of width/height.
-            anchor_feature_strides: Stride of the feature map relative
-                to the image in pixels.
-            proposal_count: int. RPN proposals kept after non-maximum
-                suppression.
-            nms_threshold: float. Non-maximum suppression threshold to
-                filter RPN proposals.
+            anchor_scales: 1D array of anchor sizes in pixels. eg.[8, 16, 32, 64, 128]
+            anchor_ratios: 1D array of anchor ratios of width/height. [0.5, 1, 2]
+            anchor_feature_strides: Stride of the feature map relative to the image in pixels. [4, 8, 16, 32, 64]
+            proposal_count: int. RPN proposals kept after non-maximum suppression.
+            nms_threshold: float. Non-maximum suppression threshold to filter RPN proposals.
             target_means: [4] Bounding box refinement mean.
             target_stds: [4] Bounding box refinement standard deviation.
             num_rpn_deltas: int.
@@ -46,14 +45,13 @@ class RPN(tf.keras.Model):
             ratios=anchor_ratios,
             feature_strides=anchor_feature_strides)
 
-
-
-
-
-
-
-
-
+        self.anchor_target = anchor_target.AnchorTarget(
+            target_means=target_means,
+            target_stds=target_stds,
+            num_rpn_deltas=num_rpn_deltas,
+            positive_fraction=positive_fraction,
+            pos_iou_thr=pos_iou_thr,
+            neg_iou_thr=neg_iou_thr)
 
         # Shared convolutional base of the RPN
         self.rpn_conv_shared = tf.keras.layers.Conv2D(512, (3, 3), padding='same',
