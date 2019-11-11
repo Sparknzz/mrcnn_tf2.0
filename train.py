@@ -33,5 +33,12 @@ img, img_meta = train_dataset[1]
 # create model
 model = mask_rcnn.MaskRCNN(num_classes=num_classes)
 
-########################### testing ###############################333
+########################### testing  RPN #################################
+# TWO THINGS ARE IMPORTANT, RPN ANCHOR REGRESSION AND ROI POOLING
+# TODO FOR RPN, NMS NEED TO BE IMPLEMENTED FOR INTERVIEW
 proposals = model.simple_test_rpn(img, img_meta)
+# after proposals generated, next step is to cut roi region for roi pooling
+res = model.simple_test_bboxes(img, img_meta, proposals)
+##########################################################################
+
+

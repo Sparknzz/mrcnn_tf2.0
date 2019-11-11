@@ -9,6 +9,7 @@ from mrcnn.backbones import resnet
 from mrcnn.fpn import fpn
 from mrcnn.rpn import rpn
 from mrcnn.test_heads import *
+from mrcnn.roi_extractors import roi_align
 
 
 class MaskRCNN(tf.keras.Model, RPNTest):
@@ -26,6 +27,7 @@ class MaskRCNN(tf.keras.Model, RPNTest):
 
         self.RPN_TARGET_MEANS = [0, 0, 0, 0]
         self.RPN_TARGET_STDS = [0.1, 0.1, 0.2, 0.2]
+        self.POOL_SIZE = 7
 
         # Modules
         self.backbone = resnet.ResNet(depth=101, name='res_net')
@@ -42,11 +44,11 @@ class MaskRCNN(tf.keras.Model, RPNTest):
             target_stds=self.RPN_TARGET_STDS,
             positive_fraction=self.RPN_POS_FRAC,
             pos_iou_thr=self.RPN_POS_IOU_THR,
-            neg_iou_thr=self.RPN_NEG_IOU_THR,)
+            neg_iou_thr=self.RPN_NEG_IOU_THR, )
 
-        # self.roi_align = roi_align.PyramidROIAlign(
-        #     pool_shape=self.POOL_SIZE,
-        #     name='pyramid_roi_align')
+        self.roi_align = roi_align.PyramidROIAlign(
+            pool_shape=self.POOL_SIZE,
+            name='pyramid_roi_align')
 
     def call(self, inputs, training=True):
         """
