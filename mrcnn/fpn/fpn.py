@@ -11,8 +11,9 @@ import os
 
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
+
 class FPN(tf.keras.Model):
-    def __init__(self, out_channels=256):
+    def __init__(self, name='fpn', out_channels=256):
         '''
         Feature Pyramid Networks
         Attributes:

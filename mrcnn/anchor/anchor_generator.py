@@ -28,21 +28,23 @@ class AnchorGenerator():
         self.ratios = ratios
         self.feature_strides = feature_strides
 
-    def generate_pyramid_anchors(self, image_shape):
+    def generate_pyramid_anchors(self, image_meta):
         """Generate anchor at different levels of a feature pyramid. Each scale
         is associated with a level of the pyramid, but each ratio is used in
         all levels of the pyramid.
-
+            image_meta: ori_image id , shape, transformed image shape 0, 1, 2, 3, 4, 5, 6
         Returns:
         anchor: [N, (y1, x1, y2, x2)]. All generated anchor in one array. Sorted
             with the same order of the given scales. So, anchor of scale[0] come
             first, then anchor of scale[1], and so on.
+            in my opinion, the anchors is in the image eg 512, 512, all anchor is not normalized pixel value
         """
         # Anchors
         # [anchor_count, (y1, x1, y2, x2)]
+        pad_shape = tf.cast(tf.reduce_max(image_meta[:, 7:9], axis=0), tf.int32).numpy()
 
-        # generate anchor
-        feature_shapes = [(image_shape[0] // stride, image_shape[1] // stride)
+        # <class 'list'>: [(304, 304), (152, 152), (76, 76), (38, 38), (19, 19)]
+        feature_shapes = [(pad_shape[0] // stride, pad_shape[1] // stride)
                           for stride in self.feature_strides]
 
         anchors = [
@@ -51,9 +53,22 @@ class AnchorGenerator():
         ]
 
         anchors = tf.concat(anchors, axis=0)
-        anchors = tf.stop_gradient(anchors)
 
-        return anchors
+        # need to find valid anchors means remove padding area anchors
+        # eg. padding size 512*512 but before padding img_size is 256*256
+        img_shapes = tf.cast(image_meta[..., 4:6], tf.int32).numpy()
+
+        # generate valid flags means without padding area
+        valid_flags = [
+            self._generate_valid_flags(anchors, img_shapes[i])
+            for i in range(img_shapes.shape[0])
+        ]
+        valid_flags = tf.stack(valid_flags, axis=0)
+
+        anchors = tf.stop_gradient(anchors)
+        valid_flags = tf.stop_gradient(valid_flags)
+
+        return anchors, valid_flags
 
     def _generate_level_anchors(self, level, feature_shape):
         scale = self.scales[level]
@@ -89,3 +104,27 @@ class AnchorGenerator():
                            box_centers + 0.5 * box_sizes], axis=1)
 
         return boxes
+
+    def _generate_valid_flags(self, anchors, img_shape):
+        '''
+        remove these anchor boxed on padded area
+        ---
+            anchors: [num_anchors, (y1, x1, y2, x2)] in image coordinates.
+            img_shape: Tuple. (height, width, channels)
+
+        Returns
+        ---
+            valid_flags: [num_anchors]
+        '''
+
+        y_center = (anchors[:, 2] + anchors[:, 0]) / 2
+        x_center = (anchors[:, 1] + anchors[:, 3]) / 2
+
+        valid_flags = tf.ones(anchors.shape[0], dtype=tf.int32)
+        zeros = tf.zeros(anchors.shape[0], dtype=tf.int32)
+
+        # set boxes whose center is out of image area as invalid.
+        valid_flags = tf.where(y_center < img_shape[0], valid_flags, zeros)
+        valid_flags = tf.where(x_center < img_shape[1], valid_flags, zeros)
+
+        return valid_flags
