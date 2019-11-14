@@ -36,20 +36,19 @@ class _Bottleneck(tf.keras.Model):
 
     def call(self, inputs, training=False):
         x = self.conv2a(inputs)
-        x = self.bn2a(x)
+        x = self.bn2a(x, training=training)
         x = tf.nn.relu(x)
 
         x = self.conv2b(x)
-        x = self.bn2b(x)
+        x = self.bn2b(x, training=training)
         x = tf.nn.relu(x)
 
         x = self.conv2c(x)
-        x = self.bn2c(x)
-        x = tf.nn.relu(x)
+        x = self.bn2c(x, training=training)
 
         if self.downsampling:
             shortcut = self.conv_shortcut(inputs)
-            shortcut = self.bn_shortcut(shortcut)
+            shortcut = self.bn_shortcut(shortcut, training=training)
         else:
             shortcut = inputs
 
@@ -127,7 +126,7 @@ class ResNet(tf.keras.Model):
         # stage 1
         x = self.padding(inputs)
         x = self.conv1(x)  # 256, 256, 64
-        x = self.bn_conv1(x)
+        x = self.bn_conv1(x, training=training)
         x = tf.nn.relu(x)
         x = self.max_pool(x)  # 128.128,64
 
@@ -190,9 +189,12 @@ class ResNet(tf.keras.Model):
 
 
 if __name__ == '__main__':
-    inputs = tf.random.uniform((1, 512, 512, 3))
+    import numpy as np
 
+    np.random.seed(22)
+    tf.random.set_seed(22)
+    inputs = tf.random.normal((1, 5, 5, 3), dtype=tf.float32)
     model = ResNet(50)
 
     output = model(inputs)
-    print(output[3])
+    print(output[0])

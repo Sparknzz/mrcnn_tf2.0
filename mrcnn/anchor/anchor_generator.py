@@ -38,6 +38,7 @@ class AnchorGenerator():
             with the same order of the given scales. So, anchor of scale[0] come
             first, then anchor of scale[1], and so on.
             in my opinion, the anchors is in the image eg 512, 512, all anchor is not normalized pixel value
+            valid_flags, each images valid flags, eg 2 images, each have 10000 anchors, then the flags is [20000,1]
         """
         # Anchors
         # [anchor_count, (y1, x1, y2, x2)]

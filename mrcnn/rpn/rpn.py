@@ -49,14 +49,6 @@ class RPN(tf.keras.Model):
             ratios=anchor_ratios,
             feature_strides=anchor_feature_strides)
 
-        self.anchor_target = anchor_target.AnchorTarget(
-            target_means=target_means,
-            target_stds=target_stds,
-            num_rpn_deltas=num_rpn_deltas,
-            positive_fraction=positive_fraction,
-            pos_iou_thr=pos_iou_thr,
-            neg_iou_thr=neg_iou_thr)
-
         # Shared convolutional base of the RPN
         self.rpn_conv_shared = tf.keras.layers.Conv2D(512, (3, 3), padding='same',
                                                       kernel_initializer='he_normal',
@@ -107,6 +99,10 @@ class RPN(tf.keras.Model):
 
         return rpn_class_logits, rpn_probs, rpn_deltas
 
+    def loss(self, rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids, img_metas):
+        pass
+
+    # NOTE MAYBE THIS IS JUST FOR TESTING FUNCTION NEED TO BE CLARIFIED
     def get_proposals(self, rpn_probs, rpn_deltas, img_metas):
         """
         generate [N, (y1,x1,y2,x2)] proposals corresponding to image
@@ -203,9 +199,6 @@ class RPN(tf.keras.Model):
         proposals = tf.gather(proposals, indices)
 
         return proposals
-
-    def loss(self):
-        pass
 
     def proposal_clip(self, proposals, window):
         wy1, wx1, wy2, wx2 = tf.split(window, 4)

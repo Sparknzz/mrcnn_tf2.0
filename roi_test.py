@@ -1,8 +1,8 @@
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
-img = plt.imread('/home/llong/Downloads/number.jpg') / 255.
-img2 = plt.imread('/home/llong/Downloads/number2.jpg') / 255.
+img = plt.imread('./images/3.jpeg') / 255.
+img2 = plt.imread('./images/3.jpeg') / 255.
 img = tf.convert_to_tensor(img, dtype=tf.float32)
 img = tf.expand_dims(img, axis=0)
 img = tf.image.resize(img, (1000, 1000))

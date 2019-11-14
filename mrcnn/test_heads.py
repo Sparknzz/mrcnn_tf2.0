@@ -12,6 +12,9 @@ class RPNTest:
             img_metas: np.ndarray. [11]
 
         '''
+
+        # NOTE This function is only used for test the rpn network running, not for training purpose
+
         imgs = tf.Variable(np.expand_dims(img, 0), dtype=tf.float32)
         img_metas = tf.Variable(np.expand_dims(img_meta, 0))
 
@@ -24,7 +27,7 @@ class RPNTest:
         # 1, rpn_anchors, 2
         proposals_list = self.rpn_head.get_proposals(rpn_probs, rpn_deltas, img_metas)
 
-        return proposals_list[0]  # note bboxes might have NAN/INF coordinates wired??
+        return proposals_list[0]
 
     def simple_test_bboxes(self, img, img_meta, proposals):
         '''
@@ -49,6 +52,7 @@ class RPNTest:
         pooled_regions_list = self.roi_align(
             (rois_list, rcnn_feature_maps, img_metas), training=False)
 
+        # stage 2
         rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = \
             self.bbox_head(pooled_regions_list, training=False)
 

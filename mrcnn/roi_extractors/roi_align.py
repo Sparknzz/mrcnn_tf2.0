@@ -110,7 +110,6 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         # NOTE: eg batch 3 10 rois each, 30 rois in total, then 30 rois belongs to different level,
         # we know the level they belongs, and the indx which is roi_to_level. eg [1, 3, 4, 10, 20, 30.......]
         # we have to find the corresponding original ix, eg no 2 belongs to level 5, which is the last one,
-        #
         sorting_tensor = roi_to_level[:, 0] * 100000 + roi_to_level[:, 1]
         ix = tf.nn.top_k(sorting_tensor, k=tf.shape(roi_to_level)[0]).indices[::-1]  # reverse the order
         ix = tf.gather(roi_to_level[:, 1], ix)

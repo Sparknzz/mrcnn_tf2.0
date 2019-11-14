@@ -40,5 +40,6 @@ proposals = model.simple_test_rpn(img, img_meta)
 # after proposals generated, next step is to cut roi region for roi pooling
 res = model.simple_test_bboxes(img, img_meta, proposals)
 ##########################################################################
-
-
+############################# training ###################################
+# inputs = imgs, img_metas, gt_boxes, gt_class_ids
+# model((img, img_meta), training=True)
