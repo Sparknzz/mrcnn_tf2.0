@@ -111,7 +111,6 @@ class DemoDataSet(object):
 
         return img, img_meta
 
-
 def compose_image_meta(image_id, original_image_shape, scaled_img_shape,
                        pad_shape, scale, active_class_ids):
     """Takes attributes of an image and puts them in one 1D array.

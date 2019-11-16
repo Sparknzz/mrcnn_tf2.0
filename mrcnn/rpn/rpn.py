@@ -1,6 +1,7 @@
 from mrcnn.anchor import anchor_generator
 from mrcnn.anchor import anchor_target
 from mrcnn.utils import *
+from mrcnn.loss import losses
 
 
 class RPN(tf.keras.Model):
@@ -49,6 +50,14 @@ class RPN(tf.keras.Model):
             ratios=anchor_ratios,
             feature_strides=anchor_feature_strides)
 
+        self.anchor_target = anchor_target.AnchorTarget(
+            target_means=(0., 0., 0., 0.),
+            target_stds=(0.1, 0.1, 0.2, 0.2),
+            num_rpn_deltas=num_rpn_deltas,
+            positive_fraction=positive_fraction,
+            pos_iou_thr=pos_iou_thr,
+            neg_iou_thr=neg_iou_thr)
+
         # Shared convolutional base of the RPN
         self.rpn_conv_shared = tf.keras.layers.Conv2D(512, (3, 3), padding='same',
                                                       kernel_initializer='he_normal',
@@ -62,8 +71,8 @@ class RPN(tf.keras.Model):
                                                      kernel_initializer='he_normal',
                                                      name='rpn_bbox_pred')
 
-        # self.rpn_class_loss = losses.rpn_class_loss
-        # self.rpn_bbox_loss = losses.rpn_bbox_loss
+        self.rpn_class_loss = losses.rpn_class_loss
+        self.rpn_bbox_loss = losses.rpn_bbox_loss
 
     def call(self, feature_maps):
         '''
@@ -100,7 +109,17 @@ class RPN(tf.keras.Model):
         return rpn_class_logits, rpn_probs, rpn_deltas
 
     def loss(self, rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids, img_metas):
-        pass
+        # NOTE RPN is used to regress the anchor and ground truth. the offset regression is deltas of (anchor, gt) - (rpn_deltas)
+        # 1. anchor generator
+        anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
+        # 2. gt match
+        rpn_target_matchs, rpn_target_deltas = self.anchor_target.build_targets(anchors, valid_flags, gt_boxes,
+                                                                                gt_class_ids)
+
+        rpn_class_loss = self.rpn_class_loss(rpn_class_logits, rpn_target_matchs)
+        rpn_box_loss = self.rpn_box_loss(rpn_deltas, rpn_target_deltas, rpn_target_matchs)
+
+        return rpn_class_loss, rpn_box_loss
 
     # NOTE MAYBE THIS IS JUST FOR TESTING FUNCTION NEED TO BE CLARIFIED
     def get_proposals(self, rpn_probs, rpn_deltas, img_metas):

@@ -54,11 +54,7 @@ class MaskRCNN(tf.keras.Model, RPNTest):
 
         # stage 2 bbox classification
 
-
         # stage 2 mask regression
-
-
-
 
     def call(self, inputs, training=True):
         """
@@ -83,19 +79,19 @@ class MaskRCNN(tf.keras.Model, RPNTest):
         # [1, 369303, 2] [1, 369303, 2], [1, 369303, 4], includes all anchor on pyramid level of features
         rpn_class_logits, rpn_probs, rpn_deltas = self.rpn_head(rpn_feature_maps, training=training)
 
+        # first stage training loss
+        if training:
+            rpn_class_loss, rpn_box_loss = self.rpn_head.loss(rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids,
+                                                              img_metas)
+
         # [369303, 4] => [215169, 4], valid => [6000, 4], performance =>[2000, 4], NMS
         # returns the normalized coordinates y1, x1, y2, x2
         proposals_list = self.rpn_head.get_proposals(rpn_probs, rpn_deltas, img_metas)
 
         # first stage
-        if training:
-            rpn_class_loss, rpn_bbox_loss = self.rpn_head.loss(
-                rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids, img_metas)
-
-        # rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss
-
         if training:  # get target value for these proposal target label and target delta
-            # todo here is second stage training purpose
-            pass
+            rois_list, rcnn_target_matchs_list, rcnn_target_deltas_list = \
+                self.bbox_target.build_targets(
+                    proposals_list, gt_boxes, gt_class_ids, img_metas)
         else:
             rois_list = proposals_list
