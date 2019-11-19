@@ -9,25 +9,40 @@ from mrcnn.fpn import fpn
 from mrcnn.roi_extractors import roi_align
 from mrcnn.rpn import rpn
 from mrcnn.test_heads import *
+from mrcnn.rcnn import bbox_head, bbox_target
 
 
 class MaskRCNN(tf.keras.Model, RPNTest):
     def __init__(self, num_classes):
         super().__init__()
-        self.NUM_CLASSES = num_classes
+        # global attributes
+        self.NUM_CLASSES = num_classes  # including background
+        self.RPN_TARGET_MEANS = [0, 0, 0, 0]
+        self.RPN_TARGET_STDS = [0.1, 0.1, 0.2, 0.2]
+        self.ANCHOR_FEATURE_STRIDES = [4, 8, 16, 32, 64]
+
+        # first stage attributes
         self.ANCHOR_SCALES = [8, 16, 32, 64, 128]
         self.ANCHOR_RATIOS = [0.5, 1, 2]
-        self.ANCHOR_FEATURE_STRIDES = [4, 8, 16, 32, 64]
-        self.PRN_BATCH_SIZE = 256  # first stage
-        self.RPN_POS_FRAC = 0.5
-        self.PRN_PROPOSAL_COUNT = 2000  # first stage nms anchors
 
+        # first stage nms anchors, after nms is 2000 anchors
+        self.PRN_NMS_THRESHOLD = 0.5
+        self.PRN_PROPOSAL_COUNT = 2000
+
+        # stage 1 training part attrs
+        self.PRN_BATCH_SIZE = 256
+        self.RPN_POS_FRAC = 0.5
         self.RPN_POS_IOU_THR = 0.7
         self.RPN_NEG_IOU_THR = 0.3
 
-        self.RPN_TARGET_MEANS = [0, 0, 0, 0]
-        self.RPN_TARGET_STDS = [0.1, 0.1, 0.2, 0.2]
+        # roi attributes
         self.POOL_SIZE = (7, 7)
+
+        # second stage attributs
+        self.RCNN_BATCH_SIZE = 256
+        self.RCNN_POS_FRAC = 0.25
+        self.RCNN_POS_IOU_THR = 0.5
+        self.RCNN_NEG_IOU_THR = 0.5
 
         # Modules
         self.backbone = resnet.ResNet(depth=101, name='res_net')
@@ -47,12 +62,28 @@ class MaskRCNN(tf.keras.Model, RPNTest):
             pos_iou_thr=self.RPN_POS_IOU_THR,
             neg_iou_thr=self.RPN_NEG_IOU_THR, )
 
-        # stage 2 roi pooling
         self.roi_align = roi_align.PyramidROIAlign(
             pool_shape=self.POOL_SIZE,
             name='pyramid_roi_align')
 
-        # stage 2 bbox classification
+        # stage 2 rcnn
+        self.bbox_target = bbox_target.ProposalTarget(
+            target_means=self.RPN_TARGET_MEANS,
+            target_stds=self.RPN_TARGET_STDS,
+            num_rcnn_deltas=self.RCNN_BATCH_SIZE,
+            positive_fraction=self.RCNN_POS_FRAC,
+            pos_iou_thr=self.RCNN_POS_IOU_THR,
+            neg_iou_thr=self.RCNN_NEG_IOU_THR)
+
+        # NOTE this is implemented by put all rois together to do batch prediction, will split at the last
+        self.bbox_head = bbox_head.BBoxHead(
+            self.NUM_CLASSES,
+            pool_size=(7, 7),
+            target_means=(0., 0., 0., 0.),
+            target_stds=(0.1, 0.1, 0.2, 0.2),
+            min_confidence=0.7,
+            nms_threshold=0.3,
+            max_instances=100, )
 
         # stage 2 mask regression
 
@@ -77,21 +108,41 @@ class MaskRCNN(tf.keras.Model, RPNTest):
         rcnn_feature_maps = [P2, P3, P4, P5]
 
         # [1, 369303, 2] [1, 369303, 2], [1, 369303, 4], includes all anchor on pyramid level of features
+        # stage 1
         rpn_class_logits, rpn_probs, rpn_deltas = self.rpn_head(rpn_feature_maps, training=training)
-
-        # first stage training loss
-        if training:
-            rpn_class_loss, rpn_box_loss = self.rpn_head.loss(rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids,
-                                                              img_metas)
 
         # [369303, 4] => [215169, 4], valid => [6000, 4], performance =>[2000, 4], NMS
         # returns the normalized coordinates y1, x1, y2, x2
-        proposals_list = self.rpn_head.get_proposals(rpn_probs, rpn_deltas, img_metas)
+        # NOTE proposals is for stage 2, no relationship with training stage 1 proposals is all foreground anchors
+        # imaging all the proposals is ready, then we can do rcnn classify
+        proposals_list = self.rpn_head.get_proposals(rpn_probs, rpn_deltas, img_metas)  # 2000
 
-        # first stage
         if training:  # get target value for these proposal target label and target delta
+            # NOTE IMPORTANT HERE IS PREPARE TRAINING SECOND STAGE
+            # NOTE HERE rois_list is not certain batch it maybe 192, 134 depends on positive anchors value
+            # and controlled by 1:3 for pos and neg
             rois_list, rcnn_target_matchs_list, rcnn_target_deltas_list = \
-                self.bbox_target.build_targets(
+                self.bbox_target.build_proposal_target(
                     proposals_list, gt_boxes, gt_class_ids, img_metas)
         else:
             rois_list = proposals_list
+
+        # rois_list only contains coordinates, rcnn_feature_maps save the 4 features data
+        pooled_regions_list = self.roi_align(
+            (rois_list, rcnn_feature_maps, img_metas), training=training)
+
+        # stage 2
+        # note in training or inference stage, the rcnn will always calculate for all pos and neg pooled rois deltas
+        # which means the outputs is same as inputs.
+        # eg [2000, 7*7*256]=>[2000, num_classes], [2000, deltas * num_classes]
+        rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = self.bbox_head(pooled_regions_list,
+                                                                                   training=training)
+
+        if training:
+            # note for rpn training, the rpn_deltas is all anchors deltas.
+            rpn_class_loss, rpn_box_loss = self.rpn_head.loss(rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids,
+                                                              img_metas)
+
+            rcnn_class_loss, rcnn_bbox_loss = self.bbox_head.loss(rcnn_class_logits_list, rcnn_deltas_list,
+                                                                  rcnn_target_matchs_list,
+                                                                  rcnn_target_deltas_list)

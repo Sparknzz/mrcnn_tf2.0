@@ -17,7 +17,7 @@ class PyramidROIAlign(tf.keras.layers.Layer):
     def call(self, inputs):
         '''
         :param inputs:
-        rois_list = [tf.Variable(proposals)],
+        rois_list = [tf.Variable(proposals)], if training rois = [(256, 4), (256, 4)]
         feature maps list: list of feature maps, [(Batch, H, W, C),(Batch, H, W, C)....] P2-P5
         img_metas.
         :return: list of pooled proposals
@@ -36,7 +36,7 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         roi_indices = tf.constant([
             i for i in range(pad_areas.shape[0]) for _ in range(rois_list[i].shape.as_list()[0])],
             dtype=tf.int32
-        )  # [0,0,0,0,0...,1,1,1,1,1,2,2,2,2....] [shape 2000 * batch] 2000 times 0, 2000 times 1, 2000 times2
+        )  # [0,0,0,0,0...,1,1,1,1,1,2,2,2,2....] [shape 256 * batch] 256 times 0, 256 times 1, 256 times2
 
         # image area
         num_rois_list = [rois.shape.as_list()[0] for rois in rois_list]  # data:[2000, 2000, ... ] how many batches
@@ -45,6 +45,9 @@ class PyramidROIAlign(tf.keras.layers.Layer):
                             dtype=tf.float32)
 
         rois = tf.concat(rois_list, axis=0)
+
+        # todo need to be checked here, cos nan value will impact tf.image.crop_resize()
+        rois = tf.where(tf.math.is_nan(rois), tf.zeros_like(rois), rois)
 
         # 1. assign each roi to a level in pyramid based on ROI area
         y1, x1, y2, x2 = tf.split(rois, 4, axis=-1)

@@ -44,7 +44,7 @@ class AnchorTarget:
 
         Args
         ---
-            anchors: [num_anchors, (y1, x1, y2, x2)] in image coordinates.
+            anchors: [num_anchors, (y1, x1, y2, x2)] in image coordinates. in traing
             valid_flags: [batch_size, num_anchors]
             gt_boxes: [batch_size, num_gt_boxes, (y1, x1, y2, x2)] in image
                 coordinates. batch_size = 1 usually
@@ -55,7 +55,7 @@ class AnchorTarget:
             rpn_target_matchs: [batch_size, num_anchors] matches between anchors and GT boxes.
                 1 = positive anchor, -1 = negative anchor, 0 = neutral anchor
             rpn_target_deltas: [batch_size, num_rpn_deltas, (dy, dx, log(dh), log(dw))]
-                Anchor bbox deltas.
+                Anchor rcnn deltas.
         '''
         rpn_target_matches = []
         rpn_target_deltas = []
@@ -89,7 +89,7 @@ class AnchorTarget:
 
          Returns
          ---
-             target_matchs: [num_anchors]
+             target_matchs: [num_anchors] 256? always? if not enough positive padding it to 256
              target_deltas: [num_rpn_deltas, (dy, dx, log(dh), log(dw))]
          '''
 
@@ -128,8 +128,8 @@ class AnchorTarget:
 
         # Subsample to balance positive and negative anchors
         # Don't let positives be more than half the anchors
-        ids = tf.where(tf.equal(target_match, 1))  # eg. [N, 1] [200,1]
-        ids = tf.squeeze(ids, -1)  # [15]
+        ids = tf.where(tf.equal(target_match, 1))
+        ids = tf.squeeze(ids, -1)
 
         extra = ids.shape.as_list[0] - int(self.positive_fraction * self.num_rpn_deltas)
         if extra > 0:

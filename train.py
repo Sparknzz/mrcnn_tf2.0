@@ -9,7 +9,7 @@ from datasets import data_generator
 # from datasets.utils import get_original_image
 from mrcnn import mask_rcnn
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 print(tf.__version__)
 assert tf.__version__.startswith('2.')

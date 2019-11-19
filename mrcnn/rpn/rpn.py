@@ -121,7 +121,6 @@ class RPN(tf.keras.Model):
 
         return rpn_class_loss, rpn_box_loss
 
-    # NOTE MAYBE THIS IS JUST FOR TESTING FUNCTION NEED TO BE CLARIFIED
     def get_proposals(self, rpn_probs, rpn_deltas, img_metas):
         """
         generate [N, (y1,x1,y2,x2)] proposals corresponding to image

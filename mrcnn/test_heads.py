@@ -52,10 +52,10 @@ class RPNTest:
         pooled_regions_list = self.roi_align(
             (rois_list, rcnn_feature_maps, img_metas), training=False)
 
-        # stage 2
         rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = \
             self.bbox_head(pooled_regions_list, training=False)
 
+        # stage 2
         detections_list = self.bbox_head.get_bboxes(
             rcnn_probs_list, rcnn_deltas_list, rois_list, img_metas)
 

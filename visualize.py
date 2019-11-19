@@ -63,7 +63,7 @@ def display_instances(image, boxes, class_ids, class_names,
 
         # Bounding box
         if not np.any(boxes[i]):
-            # Skip this instance. Has no bbox. Likely lost in image cropping.
+            # Skip this instance. Has no rcnn. Likely lost in image cropping.
             continue
         y1, x1, y2, x2 = boxes[i]
         y1, x1, y2, x2 = int(y1), int(x1), int(y2), int(x2)
@@ -135,7 +135,7 @@ def draw_boxes(image, boxes=None, refined_boxes=None,
         # Boxes
         if boxes is not None:
             if not np.any(boxes[i]):
-                # Skip this instance. Has no bbox. Likely lost in cropping.
+                # Skip this instance. Has no rcnn. Likely lost in cropping.
                 continue
             y1, x1, y2, x2 = boxes[i]
             p = patches.Rectangle((x1, y1), x2 - x1, y2 - y1, linewidth=2,

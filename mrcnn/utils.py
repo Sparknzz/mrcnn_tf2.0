@@ -87,7 +87,7 @@ def bbox2deltas(pos_anchor, gt, target_means=[0, 0, 0, 0], target_stds=[0.1, 0.1
     return deltas
 
 
-# used for rpn prediction deltas with anchors, we can generate corresponding bbox
+# used for rpn prediction deltas with anchors, we can generate corresponding rcnn
 def deltas2bbox(anchors, deltas, target_means=[0, 0, 0, 0], target_stds=[0.1, 0.1, 0.2, 0.2]):
     '''Compute bounding box based on anchor and delta.
     Args
@@ -109,7 +109,7 @@ def deltas2bbox(anchors, deltas, target_means=[0, 0, 0, 0], target_stds=[0.1, 0.
     center_y = anchors[:, 0] + 0.5 * height
     center_x = anchors[:, 1] + 0.5 * width
 
-    # convert deltas to bbox
+    # convert deltas to rcnn
     center_y += deltas[:, 0] * height
     center_x += deltas[:, 1] * width
     height *= tf.exp(deltas[:, 2])
