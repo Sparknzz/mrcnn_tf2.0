@@ -13,8 +13,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = ''
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 print(tf.__version__)
 assert tf.__version__.startswith('2.')
-tf.random.set_seed(22)
-np.random.seed(22)
+tf.random.set_seed(2019)
+np.random.seed(2019)
 
 img_mean = (123.675, 116.28, 103.53)
 # img_std = (58.395, 57.12, 57.375)
@@ -28,7 +28,7 @@ train_dataset.load_image()
 
 # train_dataset.load_mask()
 # load data
-img, img_meta = train_dataset[1]
+img, img_meta = train_dataset[2]
 
 # create model
 model = mask_rcnn.MaskRCNN(num_classes=num_classes)
@@ -39,6 +39,10 @@ model = mask_rcnn.MaskRCNN(num_classes=num_classes)
 proposals = model.simple_test_rpn(img, img_meta)
 # after proposals generated, next step is to cut roi region for roi pooling
 res = model.simple_test_bboxes(img, img_meta, proposals)
+
+visualize.display_instances(img, res['rois'], res['class_ids'], scores=res['scores'])
+plt.savefig('image_demo_ckpt.png')
+
 ##########################################################################
 ############################# training ###################################
 # inputs = imgs, img_metas, gt_boxes, gt_class_ids

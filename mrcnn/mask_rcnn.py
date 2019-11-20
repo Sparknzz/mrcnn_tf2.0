@@ -140,9 +140,17 @@ class MaskRCNN(tf.keras.Model, RPNTest):
 
         if training:
             # note for rpn training, the rpn_deltas is all anchors deltas.
-            rpn_class_loss, rpn_box_loss = self.rpn_head.loss(rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids,
-                                                              img_metas)
+            rpn_class_loss, rpn_bbox_loss = self.rpn_head.loss(rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids,
+                                                               img_metas)
 
             rcnn_class_loss, rcnn_bbox_loss = self.bbox_head.loss(rcnn_class_logits_list, rcnn_deltas_list,
                                                                   rcnn_target_matchs_list,
                                                                   rcnn_target_deltas_list)
+            return [rpn_class_loss, rpn_bbox_loss,
+                    rcnn_class_loss, rcnn_bbox_loss]
+
+        else:
+            detections_list = self.bbox_head.get_bboxes(
+                rcnn_probs_list, rcnn_deltas_list, rois_list, img_metas)
+
+            return detections_list

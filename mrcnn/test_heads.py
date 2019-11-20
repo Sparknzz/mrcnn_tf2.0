@@ -1,6 +1,7 @@
 # this is the testing file, used to test all heads of mask rcnn
-import tensorflow as tf
 import numpy as np
+
+from utils import *
 
 
 class RPNTest:
@@ -29,6 +30,27 @@ class RPNTest:
 
         return proposals_list[0]
 
+    def _unmold_detections(self, detections_list, img_metas):
+        return [
+            self._unmold_single_detection(detections_list[i], img_metas[i])
+            for i in range(img_metas.shape[0])
+        ]
+
+    def _unmold_single_detection(self, detections, img_meta):
+        non_zero_ix = tf.where(tf.not_equal(detections[:, 4], 0))
+        detections = tf.gather_nd(detections, non_zero_ix)
+
+        # Extract boxes, class_ids, scores, and class-specific masks
+        boxes = detections[:, :4]
+        class_ids = tf.cast(detections[:, 4], tf.int32)
+        scores = detections[:, 5]
+
+        # boxes = bbox_mapping_back(boxes, img_meta)
+
+        return {'rois': boxes.numpy(),
+                'class_ids': class_ids.numpy(),
+                'scores': scores.numpy()}
+
     def simple_test_bboxes(self, img, img_meta, proposals):
         '''
         Args
@@ -55,7 +77,6 @@ class RPNTest:
         rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = \
             self.bbox_head(pooled_regions_list, training=False)
 
-        # stage 2
         detections_list = self.bbox_head.get_bboxes(
             rcnn_probs_list, rcnn_deltas_list, rois_list, img_metas)
 

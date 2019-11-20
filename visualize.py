@@ -27,7 +27,7 @@ def random_colors(N, bright=True):
     return colors
 
 
-def display_instances(image, boxes, class_ids, class_names,
+def display_instances(image, boxes, class_ids, class_names=['bg', 'test'],
                       scores=None, title="",
                       figsize=(16, 16), ax=None):
     '''
