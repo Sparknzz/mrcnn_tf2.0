@@ -143,3 +143,46 @@ def rcnn_class_loss(rcnn_target_matchs_list, rcnn_class_logits_list):
     loss = tf.reduce_mean(loss) if tf.size(loss) > 0 else tf.constant(0.0)
 
     return loss
+
+
+def rcnn_mask_loss(target_mask_list, target_class_ids_list, mrcnn_mask_list):
+    """Mask binary cross-entropy loss for the masks head.
+    Params:
+    -----------------------------------------------------------
+        target_masks: [batch, num_rois, height, width].
+                        A float32 tensor of values 0 or 1. Uses zero padding to fill array.
+        target_class_ids: [batch*num_rois]. Integer class IDs. Zero padded.
+        pred_masks: [batch*proposals, height, width, num_classes] float32 tensor
+                        with values from 0 to 1.
+    """
+    target_masks = tf.concat(target_mask_list, axis=0)
+    target_class_ids = tf.concat(target_class_ids_list, axis=0)
+    pred_masks = tf.concat(mrcnn_mask_list, axis=0)
+
+    # Reshape for simplicity. Merge first two dimensions into one.
+    target_class_ids = tf.reshape(target_class_ids, (-1,))
+    # todo to check the dimens
+    mask_shape = tf.shape(target_masks)  # n, c, h, w
+    target_masks = tf.reshape(target_masks, (-1, mask_shape[2], mask_shape[3]))
+    # b, n, h, w, c
+    pred_shape = tf.shape(pred_masks)
+    pred_masks = tf.reshape(pred_masks, (-1, pred_shape[2], pred_shape[3], pred_shape[4]))
+
+    # Permute predicted masks to [N, num_classes, height, width]
+    pred_masks = tf.transpose(pred_masks, [0, 3, 1, 2])
+
+    # Only positive ROIs contribute to the loss. And only the class specific mask of each ROI.
+    positive_roi_idx = tf.where(target_class_ids > 0)[:0]
+    positive_roi_class_ids = tf.cast(tf.gather(target_class_ids, positive_roi_idx), dtype=tf.int32)
+    indices = tf.stack([positive_roi_idx, positive_roi_class_ids], axis=1)
+
+    # Gather the masks (predicted and true) that contribute to loss
+    y_true = tf.gather(target_masks, positive_roi_idx)
+    y_pred = tf.gather_nd(pred_masks, indices)  # cos pred_masks is nchw  choose no. first then choose class_id
+
+    # Compute binary cross entropy.  If no positive ROIs, then return 0.
+    loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
+
+    loss = tf.reduce_mean(loss) if loss.size() > 0 else tf.constant(0.0, dtype=tf.float32)
+
+    return loss

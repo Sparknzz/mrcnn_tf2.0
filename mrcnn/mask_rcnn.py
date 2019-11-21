@@ -9,7 +9,7 @@ from mrcnn.fpn import fpn
 from mrcnn.roi_extractors import roi_align
 from mrcnn.rpn import rpn
 from mrcnn.test_heads import *
-from mrcnn.rcnn import bbox_head, bbox_target
+from mrcnn.rcnn import bbox_head, detection_target, mask_head
 
 
 class MaskRCNN(tf.keras.Model, RPNTest):
@@ -67,7 +67,7 @@ class MaskRCNN(tf.keras.Model, RPNTest):
             name='pyramid_roi_align')
 
         # stage 2 rcnn
-        self.bbox_target = bbox_target.ProposalTarget(
+        self.bbox_target = detection_target.ProposalTarget(
             target_means=self.RPN_TARGET_MEANS,
             target_stds=self.RPN_TARGET_STDS,
             num_rcnn_deltas=self.RCNN_BATCH_SIZE,
@@ -85,7 +85,8 @@ class MaskRCNN(tf.keras.Model, RPNTest):
             nms_threshold=0.3,
             max_instances=100, )
 
-        # stage 2 mask regression
+        # stage 2 mask branch
+        self.mask_head = mask_head.MaskHead()
 
     def call(self, inputs, training=True):
         """
@@ -121,9 +122,10 @@ class MaskRCNN(tf.keras.Model, RPNTest):
             # NOTE IMPORTANT HERE IS PREPARE TRAINING SECOND STAGE
             # NOTE HERE rois_list is not certain batch it maybe 192, 134 depends on positive anchors value
             # and controlled by 1:3 for pos and neg
-            rois_list, rcnn_target_matchs_list, rcnn_target_deltas_list = \
+            rois_list, rcnn_target_matchs_list, rcnn_target_deltas_list, rcnn_target_mask_list = \
                 self.bbox_target.build_proposal_target(
-                    proposals_list, gt_boxes, gt_class_ids, img_metas)
+                    proposals_list, gt_boxes, gt_class_ids, gt_masks, img_metas)
+
         else:
             rois_list = proposals_list
 
@@ -137,6 +139,8 @@ class MaskRCNN(tf.keras.Model, RPNTest):
         # eg [2000, 7*7*256]=>[2000, num_classes], [2000, deltas * num_classes]
         rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = self.bbox_head(pooled_regions_list,
                                                                                    training=training)
+        # mask branch
+        mrcnn_mask_list = self.mask_head(pooled_regions_list)
 
         if training:
             # note for rpn training, the rpn_deltas is all anchors deltas.
@@ -146,8 +150,11 @@ class MaskRCNN(tf.keras.Model, RPNTest):
             rcnn_class_loss, rcnn_bbox_loss = self.bbox_head.loss(rcnn_class_logits_list, rcnn_deltas_list,
                                                                   rcnn_target_matchs_list,
                                                                   rcnn_target_deltas_list)
+
+            rcnn_mask_loss = self.mask_head.loss(rcnn_target_mask_list, rcnn_target_matchs_list, mrcnn_mask_list)
+
             return [rpn_class_loss, rpn_bbox_loss,
-                    rcnn_class_loss, rcnn_bbox_loss]
+                    rcnn_class_loss, rcnn_bbox_loss, rcnn_mask_loss]
 
         else:
             detections_list = self.bbox_head.get_bboxes(
