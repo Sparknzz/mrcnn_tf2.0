@@ -135,7 +135,11 @@ class ProposalTarget(object):
 
         if self.config.USE_MINI_MASK:
             # important!!! as the mini mask coordinate was resized to square
-            # and mini mask is a whole image not a part of image,
+            # my understanding is that the mini mask is cropped from original img.
+            # remember mini mask is just a part of img. however,
+            # all gt or rois coordinates are based on img coordinates.
+            # so you have to calculate the proportion of them.
+            # which means the position should be normalized for small mask instead of whole img.
             # but the gt or rois are not resized!!!
             # so the roi need to be transformed to normalized position.
             y1, x1, y2, x2 = tf.split(positive_rois, 4, axis=1)

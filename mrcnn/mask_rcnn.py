@@ -86,7 +86,7 @@ class MaskRCNN(tf.keras.Model, RPNTest):
             max_instances=100, )
 
         # stage 2 mask branch
-        self.mask_head = mask_head.MaskHead()
+        self.mask_head = mask_head.MaskHead(self.NUM_CLASSES, )
 
     def call(self, inputs, training=True):
         """
@@ -95,7 +95,7 @@ class MaskRCNN(tf.keras.Model, RPNTest):
         :return:
         """
         if training:  # training
-            imgs, img_metas, gt_boxes, gt_class_ids = inputs
+            imgs, img_metas, gt_boxes, gt_class_ids, gt_masks = inputs
         else:  # inference
             imgs, img_metas = inputs
 
@@ -109,34 +109,40 @@ class MaskRCNN(tf.keras.Model, RPNTest):
         rcnn_feature_maps = [P2, P3, P4, P5]
 
         # [1, 369303, 2] [1, 369303, 2], [1, 369303, 4], includes all anchor on pyramid level of features
-        # stage 1
+        # stage 1 attributes
         rpn_class_logits, rpn_probs, rpn_deltas = self.rpn_head(rpn_feature_maps, training=training)
 
-        # [369303, 4] => [215169, 4], valid => [6000, 4], performance =>[2000, 4], NMS
+        # stage 2 attributes
+        # when the logic comes to here, that means the proposal refinement is ok. proposal is ready to use
         # returns the normalized coordinates y1, x1, y2, x2
-        # NOTE proposals is for stage 2, no relationship with training stage 1 proposals is all foreground anchors
-        # imaging all the proposals is ready, then we can do rcnn classify
+        # NOTE proposals is for stage 2, no relationship with training stage 1 proposals is all foreground anchors.
         proposals_list = self.rpn_head.get_proposals(rpn_probs, rpn_deltas, img_metas)  # 2000
+        # todo note here, when training, we only selected 256 anchors to do regression,
+        #  but the proposals we generate 2000
 
-        if training:  # get target value for these proposal target label and target delta
+        ###########################################  core  ###################################################
+        if training:
+            # get target value for these proposal target label and target delta
             # NOTE IMPORTANT HERE IS PREPARE TRAINING SECOND STAGE
             # NOTE HERE rois_list is not certain batch it maybe 192, 134 depends on positive anchors value
             # and controlled by 1:3 for pos and neg
+            # todo like stage 1 , I want to move this into rcnn loss function,
+            #  as the target build only used for loss regression.
+            #  however, we need the rois list, they are different.
+            #  cos rois_list is 2000 in inference, but in training it not certain number
             rois_list, rcnn_target_matchs_list, rcnn_target_deltas_list, rcnn_target_mask_list = \
                 self.bbox_target.build_proposal_target(
                     proposals_list, gt_boxes, gt_class_ids, gt_masks, img_metas)
 
         else:
             rois_list = proposals_list
+        #######################################################################################################
 
         # rois_list only contains coordinates, rcnn_feature_maps save the 4 features data
         pooled_regions_list = self.roi_align(
             (rois_list, rcnn_feature_maps, img_metas), training=training)
 
-        # stage 2
-        # note in training or inference stage, the rcnn will always calculate for all pos and neg pooled rois deltas
-        # which means the outputs is same as inputs.
-        # eg [2000, 7*7*256]=>[2000, num_classes], [2000, deltas * num_classes]
+        #############################################  stage 2  ##############################################
         rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = self.bbox_head(pooled_regions_list,
                                                                                    training=training)
         # mask branch

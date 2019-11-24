@@ -1,12 +1,9 @@
 import os
-import tensorflow as tf
-from tensorflow import keras
+
 import numpy as np
-from matplotlib import pyplot as plt
-import visualize
+import tensorflow as tf
+from datasets.data_generator import *
 from datasets import my_dataset
-from datasets import data_generator
-# from datasets.utils import get_original_image
 from mrcnn import mask_rcnn
 
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
@@ -19,36 +16,65 @@ np.random.seed(2019)
 img_mean = (123.675, 116.28, 103.53)
 # img_std = (58.395, 57.12, 57.375)
 img_std = (1., 1., 1.)
+
 batch_size = 1
-
 num_classes = 2
-
-train_dataset = my_dataset.DemoDataSet('images', 'train')
-train_dataset.load_image()
-
-# train_dataset.load_mask()
-# load data
-img, img_meta = train_dataset[2]
 
 # create model
 model = mask_rcnn.MaskRCNN(num_classes=num_classes)
 
+
+############################# training ###################################
+def train():
+    """Train the model."""
+    # Training dataset.
+    train_dataset = my_dataset.MyDataSet()
+    train_dataset.load_balloon('images', 'train')
+    train_dataset.prepare()
+
+    # create data generator
+    train_generator = data_generator(train_dataset, None, shuffle=True,
+                                     augmentation=None, augment=False,
+                                     batch_size=batch_size)
+
+    # Validation dataset
+    # dataset_train = my_dataset.MyDataSet()
+    # dataset_train.load_balloon('images', 'val')
+    # dataset_train.prepare()
+
+    optimizer = tf.keras.optimizers.SGD(1e-3, momentum=0.9, nesterov=True)
+
+    loss_history = []
+
+    for epoch in range(100):
+
+        for (batch, inputs) in enumerate(train_generator):
+            # inputs = imgs, img_metas, gt_boxes, gt_class_ids, gt_masks
+            with tf.GradientTape() as tape:
+                rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss, \
+                rcnn_mask_loss = model(inputs, training=True)
+
+                total_loss = rpn_class_loss + rpn_bbox_loss + rcnn_class_loss + rcnn_bbox_loss + rcnn_mask_loss
+
+            grads = tape.gradient(total_loss, model.trainable_variables)
+            optimizer.apply_gradient(zip(grads, model.trainable_variables))
+            loss_history.append(total_loss.numpy())
+
+            if batch % 10 == 0:
+                print('epoch', epoch, batch, np.mean(loss_history))
+
+
 ########################### testing #################################
 # TWO THINGS ARE IMPORTANT, RPN ANCHOR REGRESSION AND ROI POOLING
 # TODO FOR RPN, NMS NEED TO BE IMPLEMENTED FOR INTERVIEW
-proposals = model.simple_test_rpn(img, img_meta)
+# proposals = model.simple_test_rpn(img, img_meta)
 # STAGE 2 TESTING
 # after proposals generated, next step is to cut roi region for roi pooling
-res = model.simple_test_bboxes(img, img_meta, proposals)
+# res = model.simple_test_bboxes(img, img_meta, proposals)
 
 # visualize.display_instances(img, res['rois'], res['class_ids'], scores=res['scores'])
 # plt.savefig('image_demo_ckpt.png')
 
-############################# Mask branch ############################
-
-
 
 ##########################################################################
-############################# training ###################################
-# inputs = imgs, img_metas, gt_boxes, gt_class_ids
-# model((img, img_meta), training=True)
+train()

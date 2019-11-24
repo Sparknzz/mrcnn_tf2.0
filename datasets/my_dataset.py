@@ -1,80 +1,108 @@
+import json
 import os
 
 from datasets.custom_transform import *
+from datasets.dataset import *
 
 
-class DemoDataSet(object):
-    def __init__(self, dataset_dir, mode, debug=False):
-        '''Load a subset of the COCO dataset.
+class MyDataSet(Dataset):
 
-        Attributes
-        ---
-            dataset_dir: The root directory of the COCO dataset.
-            mode: What to load (train, val).
-            scale: Tuple of two integers.
-        '''
-        self.dataset_dir = dataset_dir
-        self.image_info = []
-        self.class_info = [{'id': 0, 'name': 'BG'}]
-        self.mode = mode
-        if mode not in ['train', 'val']:
-            raise AssertionError('mode must be "train" or "val".')
-
-    def add_class(self, class_id, class_name):
-        for info in self.class_info:
-            if info["id"] == class_id:
-                return
-
-        # Add the class
-        self.class_info.append({
-            "id": class_id,
-            "name": class_name,
-        })
-
-    def add_image(self, image_id, path):
-        image_info = {
-            "id": image_id,
-            "path": path,
-        }
-
-        self.image_info.append(image_info)
-
-    def load_image(self):
-        """Generate the requested number of synthetic images.
-        count: number of images to generate.
-        height, width: the size of the generated images.
+    def load_balloon(self, dataset_dir, subset):
+        """Load a subset of the Balloon dataset.
+        dataset_dir: Root directory of the dataset.
+        subset: Subset to load: train or val
         """
-        # Add classes
-        self.add_class(1, "concrete")  # id, name
+        source = 'balloon'
+        # Add classes. We have only one class to add.
+        self.add_class(source, 1, "balloon")
 
-        paths = os.listdir(self.dataset_dir)
+        # Train or validation dataset?
+        assert subset in ["train", "val"]
+        image_dir = os.path.join(dataset_dir, subset, 'images')
 
-        # Add images
-        for i in range(len(paths)):
-            self.add_image(image_id=i, path=paths[i])
+        anno_dir = os.path.join(dataset_dir, subset, 'annotations')
+
+        # normally we will have our own dataset,
+        # it apparently should be a listdir, or sometimes can be .npy file for split folds
+        image_list = os.listdir(image_dir)
+        image_names = []  # normally ids is unique id == name
+
+        for img in image_list:
+            image_names.append(img[:-4])
+
+        # Load annotations
+        # {
+        #   'version': '3.16.1',
+        #   'flags': {},
+        #   'shapes' : [
+        #       {
+        #           'label':'xx'
+        #           'line_color':null
+        #           'fill_color':null
+        #           'points':[[x,y],[x,y],[x,y]]
+        #       },
+        #       {},
+        #       {},
+        #       {},
+        #   ],
+        #   'lineColor':
+        #   'fillColor':
+        #   'imagePath':
+        #   'imageData': null
+        #   'imageHeight': 1000
+        #   'imageWidth': 1000
+        # }
+
+        for i in range(len(image_names)):
+            annotations = json.load(open(os.path.join(anno_dir, image_names[i] + ".json")))
+
+            shapes = annotations['shapes']  # shapes include all region
+
+            polygons = [shape['points'] for shape in shapes]  # list of list
+
+            height = annotations['imageHeight']
+            width = annotations['imageWidth']
+
+            self.add_image(
+                source=source,
+                image_id=i,
+                path=os.path.join(dataset_dir, image_names[i] + '.jpg'),
+                width=width, height=height,
+                polygons=polygons)
 
     def load_mask(self, image_id):
-        """Load instance masks for the given image.
-
-        Different datasets use different ways to store masks. Override this
-        method to load instance masks and return them in the form of am
-        array of binary masks of shape [height, width, instances].
-
-        Returns:
-            masks: A bool array of shape [height, width, instance count] with
-                a binary mask per instance.
-            class_ids: a 1D array of class IDs of the instance masks.
         """
-        # Override this function to load a mask from your dataset.
-        # Otherwise, it returns an empty mask.
-        mask = np.empty([0, 0, 0])
-        class_ids = np.empty([0], np.int32)
-        return mask, class_ids
+        Generate instance masks for an image.
+        index for id in the list, not image_id.
+        images_info is a [{'source':, 'class_id':, 'path':}]
 
-    def __len__(self):
-        return len(self.img_infos)
+        in this stage, depends on the annotation choice, you can load json file or mask png file
+        Returns:
+        masks: A bool array of shape [height, width, instance count] with
+            one mask per instance.
+        class_ids: a 1D array of class IDs of the instance masks.
+        """
+        image_info = self.images_info[image_id]
 
-    def __getitem__(self, idx):
+        # root_dir = ''
+        # Get mask directory from image path normally our dir is SegmentationClassPNG
+        # mask_dir = os.path.join(root_dir, 'SegmentationClassPNG')
+
+        mask = np.zeros([image_info["height"], image_info["width"], len(image_info["polygons"])],
+                        dtype=np.uint8)  # eg 1000*1000*10 mask
+        for i, p in enumerate(image_info["polygons"]):
+            p = np.array(p).astype(np.int32)
+            all_points_x = p[:, 0]
+            all_points_y = p[:, 1]
+            # Get indexes of pixels inside the polygon and set them to 1
+            rr, cc = skimage.draw.polygon(all_points_y, all_points_x)
+            mask[rr, cc, i] = 1
+
+        # Return mask, and array of class IDs of each instance. Since we have
+        # one class ID, we return an array of ones
+        return mask, np.ones([mask.shape[-1]], dtype=np.int32)
+
+    def __getitem__(self, index):
         # todo need to implement mask logic here
 
         '''Load the image and its bboxes for the given index.
@@ -85,7 +113,7 @@ class DemoDataSet(object):
             tuple: A tuple containing the following items: image, bboxes, labels.
         '''
 
-        img_info = self.image_info[idx]
+        img_info = self.image_info[index]
 
         # load the image.
         img = cv2.imread(os.path.join(self.dataset_dir, img_info['path']), cv2.IMREAD_COLOR)
@@ -110,6 +138,7 @@ class DemoDataSet(object):
             pad_shape=img.shape, scale=[8, 16, 32], active_class_ids=[1])
 
         return img, img_meta
+
 
 def compose_image_meta(image_id, original_image_shape, scaled_img_shape,
                        pad_shape, scale, active_class_ids):

@@ -111,13 +111,14 @@ class RPN(tf.keras.Model):
     def loss(self, rpn_class_logits, rpn_deltas, gt_boxes, gt_class_ids, img_metas):
         # NOTE RPN is used to regress the anchor and ground truth. the offset regression is deltas of (anchor, gt) - (rpn_deltas)
         # 1. anchor generator
+        # todo anchor generated two times, other one for generate proposals
         anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
         # 2. gt match
         rpn_target_matchs, rpn_target_deltas = self.anchor_target.build_targets(anchors, valid_flags, gt_boxes,
                                                                                 gt_class_ids)
 
         rpn_class_loss = self.rpn_class_loss(rpn_class_logits, rpn_target_matchs)
-        rpn_box_loss = self.rpn_box_loss(rpn_deltas, rpn_target_deltas, rpn_target_matchs)
+        rpn_box_loss = self.rpn_bbox_loss(rpn_deltas, rpn_target_deltas, rpn_target_matchs)
 
         return rpn_class_loss, rpn_box_loss
 
