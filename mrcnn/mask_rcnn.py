@@ -10,7 +10,7 @@ from mrcnn.roi_extractors import roi_align
 from mrcnn.rpn import rpn
 from mrcnn.test_heads import *
 from mrcnn.rcnn import bbox_head, detection_target, mask_head
-
+import tensorflow as tf
 
 class MaskRCNN(tf.keras.Model, RPNTest):
     def __init__(self, num_classes):

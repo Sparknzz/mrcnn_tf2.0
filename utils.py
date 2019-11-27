@@ -1,6 +1,3 @@
-import tensorflow as tf
-
-
 def parse_image_meta(meta):
     '''
     Parses a tensor that contains image attributes to its components.

@@ -19,7 +19,7 @@ class ProposalTarget(object):
 
     def build_proposal_target(self, proposal_list, gt_boxes, gt_class_ids, gt_masks, img_metas):
         '''
-        Generates detection targets for images. Subsamples proposals and
+        Generates detection targets for data. Subsamples proposals and
         generates target class IDs, bounding box deltas for each.
 
         Args
@@ -37,7 +37,7 @@ class ProposalTarget(object):
             rcnn_target_deltas_list: list of [num_positive_rois, (dy, dx, log(dh), log(dw))].
 
         Note that self.num_rcnn_deltas >= num_rois > num_positive_rois. And different
-           images in one batch may have different num_rois and num_positive_rois.
+           data in one batch may have different num_rois and num_positive_rois.
         '''
 
         pad_shapes = tf.cast(img_metas[:, 7:9], tf.int32)

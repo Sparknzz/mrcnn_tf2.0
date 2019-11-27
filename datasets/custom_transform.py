@@ -17,7 +17,7 @@ def augment(augmentation, image, mask):
     # Store shapes before augmentation to compare
     image_shape = image.shape
     mask_shape = mask.shape
-    # Make augmenters deterministic to apply similarly to images and masks
+    # Make augmenters deterministic to apply similarly to data and masks
     det = augmentation.to_deterministic()
     image = det.augment_image(image)
     # Change mask to np.uint8 because imgaug doesn't support np.bool

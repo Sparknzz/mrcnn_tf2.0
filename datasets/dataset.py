@@ -48,7 +48,7 @@ class Dataset(object):
         """Load the specified image and return a [H,W,3] Numpy array.
         """
         # Load image
-        image = skimage.io.imread(self.image_info[image_id]['path'])
+        image = skimage.io.imread(self.images_info[image_id]['path'])
         # If grayscale. Convert to RGB for consistency.
         if image.ndim != 3:
             image = skimage.color.gray2rgb(image)
@@ -92,8 +92,22 @@ class Dataset(object):
         self._images_ids = np.arange(self.num_images)
 
         # Mapping from source class and image IDs to internal IDs  output: eg ballon.0:0 ballon.1:1???
-        self.class_from_source_map = {"{}.{}".format(info['source'], info['class_id']): id for info, id in
-                                      zip(self.class_info, self.class_ids)}
+        # self.class_from_source_map = {"{}.{}".format(info['source'], info['class_id']): id for info, id in
+        #                               zip(self.class_info, self.class_ids)}
         # output: eg balloon.im_id:0
-        self.image_from_source_map = {"{}.{}".format(info['source'], info['id']): id
-                                      for info, id in zip(self.images_info, self.image_ids)}
+        # self.image_from_source_map = {"{}.{}".format(info['source'], info['id']): id
+        #                               for info, id in zip(self.images_info, self.image_ids)}
+
+        # Map sources to class_ids they support
+        self.sources = list(set([i['source'] for i in self.class_info]))
+        # if self.class_info has 3 classes info: [{'source':'', 'id':0, 'name':'BG'}, {'source':'balloon', 'id':1, 'name':'balloon'}, {'source':'balloon'...}]
+        # todo check why do they want to loop all dataset ??????
+        self.source_class_ids = {}
+        # Loop over datasets
+        for source in self.sources:
+            self.source_class_ids[source] = []
+            # Find classes that belong to this dataset
+            for i, info in enumerate(self.class_info):
+                # Include BG class in all datasets
+                if i == 0 or source == info['source']:
+                    self.source_class_ids[source].append(i)

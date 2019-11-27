@@ -66,7 +66,7 @@ class MyDataSet(Dataset):
             self.add_image(
                 source=source,
                 image_id=i,
-                path=os.path.join(dataset_dir, image_names[i] + '.jpg'),
+                path=os.path.join(dataset_dir, subset, 'images', image_names[i] + '.jpg'),
                 width=width, height=height,
                 polygons=polygons)
 
@@ -102,43 +102,6 @@ class MyDataSet(Dataset):
         # one class ID, we return an array of ones
         return mask, np.ones([mask.shape[-1]], dtype=np.int32)
 
-    def __getitem__(self, index):
-        # todo need to implement mask logic here
-
-        '''Load the image and its bboxes for the given index.
-        Args
-            idx: the index of images.
-        Returns
-        ---
-            tuple: A tuple containing the following items: image, bboxes, labels.
-        '''
-
-        img_info = self.image_info[index]
-
-        # load the image.
-        img = cv2.imread(os.path.join(self.dataset_dir, img_info['path']), cv2.IMREAD_COLOR)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-        ori_shape = img.shape
-
-        if self.mode == 'train':
-            tr = ImageTransform()
-            img, scaled_img_shape, scale_factor = tr(img)
-
-        else:
-            scaled_img_shape = img.shape
-        #
-        # else:
-        #     pass
-
-        img_meta = compose_image_meta(
-            image_id=img_info['id'],
-            original_image_shape=ori_shape,
-            scaled_img_shape=scaled_img_shape,
-            pad_shape=img.shape, scale=[8, 16, 32], active_class_ids=[1])
-
-        return img, img_meta
-
 
 def compose_image_meta(image_id, original_image_shape, scaled_img_shape,
                        pad_shape, scale, active_class_ids):
@@ -150,7 +113,7 @@ def compose_image_meta(image_id, original_image_shape, scaled_img_shape,
     pad_shape: [H, W, C] after padding
     scale: The scaling factor applied to the original image (float32)
     active_class_ids: List of class_ids available in the dataset from which
-        the image came. Useful if training on images from multiple datasets
+        the image came. Useful if training on data from multiple datasets
         where not all classes are present in all datasets.
     """
     meta = np.array(

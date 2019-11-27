@@ -145,7 +145,7 @@ class RPN(tf.keras.Model):
                 [num_proposals, (y1, x1, y2, x2, score)]
 
         Note that num_proposals is no more than proposal_count. And different
-           images in one batch may have different num_proposals.
+           data in one batch may have different num_proposals.
         """
 
         # this including padded zero areas

@@ -13,6 +13,42 @@ import shutil
 import warnings
 
 
+def mold_image(images, config):
+    """Expects an RGB image (or array of data) and subtracts
+    the mean pixel and converts it to float. Expects image
+    colors in RGB order.
+    """
+    return images.astype(np.float32) - config.MEAN_PIXEL
+
+############################################################
+#  Data Formatting
+############################################################
+
+def compose_image_meta(image_id, original_image_shape, image_shape,
+                       window, scale, active_class_ids):
+    """Takes attributes of an image and puts them in one 1D array.
+
+    image_id: An int ID of the image. Useful for debugging.
+    original_image_shape: [H, W, C] before resizing or padding.
+    image_shape: [H, W, C] after resizing and padding
+    window: (y1, x1, y2, x2) in pixels. The area of the image where the real
+            image is (excluding the padding)
+    scale: The scaling factor applied to the original image (float32)
+    active_class_ids: List of class_ids available in the dataset from which
+        the image came. Useful if training on data from multiple datasets
+        where not all classes are present in all datasets.
+    """
+    meta = np.array(
+        [image_id] +  # size=1
+        list(original_image_shape) +  # size=3
+        list(image_shape) +  # size=3
+        list(window) +  # size=4 (y1, x1, y2, x2) in image coordinates
+        [scale[0]] +  # size=1
+        list(active_class_ids)  # size=num_classes
+    )
+    return meta
+
+
 def resize_image(image, min_dim=None, max_dim=None, min_scale=None,
                  mode="square", aspect_ratio=1):
     """Resizes an image keeping the aspect ratio unchanged.
@@ -155,3 +191,40 @@ def extract_bboxes(mask):
         boxes[i] = np.array([y1, x1, y2, x2])
 
     return boxes.astype(np.int32)
+
+
+def minimize_mask(bbox, mask, mini_shape):
+    """Resize masks to a smaller version to reduce memory load.
+    Mini-masks can be resized back to image scale using expand_masks()
+    """
+
+    mini_mask = np.zeros(mini_shape + (mask.shape[-1],), dtype=bool)
+    for i in range(mask.shape[-1]):
+        # Pick slice and cast to bool in case load_mask() returned wrong dtype
+        m = mask[:, :, i].astype(bool)
+        y1, x1, y2, x2 = bbox[i][:4]
+        m = m[y1:y2, x1:x2]
+        if m.size == 0:
+            raise Exception("Invalid bounding box with area of zero")
+        # Resize with bilinear interpolation
+        m = resize(m, mini_shape)
+        mini_mask[:, :, i] = np.around(m).astype(np.bool)
+    return mini_mask
+
+
+def resize(image, output_shape, order=1, mode='constant', cval=0, clip=True,
+           preserve_range=False, anti_aliasing=False, anti_aliasing_sigma=None):
+    """A wrapper for Scikit-Image resize().
+
+    Scikit-Image generates warnings on every call to resize() if it doesn't
+    receive the right parameters. The right parameters depend on the version
+    of skimage. This solves the problem by using different parameters per
+    version. And it provides a central place to control resizing defaults.
+    """
+    # New in 0.14: anti_aliasing. Default it to False for backward
+    # compatibility with skimage 0.13.
+    return skimage.transform.resize(
+        image, output_shape,
+        order=order, mode=mode, cval=cval, clip=clip,
+        preserve_range=preserve_range, anti_aliasing=anti_aliasing,
+        anti_aliasing_sigma=anti_aliasing_sigma)
