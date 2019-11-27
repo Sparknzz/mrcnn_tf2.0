@@ -2,13 +2,14 @@ from mrcnn.utils import *
 
 
 class ProposalTarget(object):
-    def __init__(self, target_means=(0., 0., 0., 0.),
+    def __init__(self, config, target_means=(0., 0., 0., 0.),
                  target_stds=(0.1, 0.1, 0.2, 0.2),
                  num_rcnn_deltas=256,
                  positive_fraction=0.25,
-                 mask_shape=28,
+                 mask_shape=[28, 28],
                  pos_iou_thr=0.5,
                  neg_iou_thr=0.5):
+        self.config = config
         self.target_means = target_means
         self.target_stds = target_stds
         self.num_rcnn_deltas = num_rcnn_deltas
@@ -28,7 +29,7 @@ class ProposalTarget(object):
             gt_boxes: [batch_size, num_gt_boxes, (y1, x1, y2, x2)] in image coordinates.
             gt_class_ids: [batch_size, num_gt_boxes] Integer class IDs.
             gt_masks : [batch_size, num_gt_masks, (7*7)]
-            img_metas: [batch_size, 11]
+            img_metas: [batch_size, 14]
 
         Returns
         ---
@@ -40,7 +41,7 @@ class ProposalTarget(object):
            data in one batch may have different num_rois and num_positive_rois.
         '''
 
-        pad_shapes = tf.cast(img_metas[:, 7:9], tf.int32)
+        pad_shapes = get_batch_pad_shape(img_metas)
 
         rois_list = []
         rcnn_target_match_list = []
@@ -66,7 +67,7 @@ class ProposalTarget(object):
         gt_boxes: [N, 4]
         gt_class_ids: [N]
         gt_masks: [height, width, MAX_GT_INSTANCES] of boolean type.
-        pad_shapes: eg.[1216,1216]
+        pad_shapes: eg.[1024,1024]
 
         return :
             this is only in training process, the 256 is not certain value. maybe 134....
@@ -86,7 +87,7 @@ class ProposalTarget(object):
 
         gt_class_ids = tf.boolean_mask(gt_class_ids, non_zeros)
 
-        gt_boxes = gt_boxes / tf.constant([H, W, H, W], dtype=tf.float32)
+        gt_boxes = tf.cast(gt_boxes, dtype=tf.float32) / tf.constant([H, W, H, W], dtype=tf.float32)
 
         # 2. calculate overlaps bet gt and proposals
         overlaps = compute_overlaps(proposals, gt_boxes)
@@ -100,7 +101,7 @@ class ProposalTarget(object):
         # 4. find out negative proposals according to ratio
         neg_indices = tf.where(proposal_iou_max < self.neg_iou_thr)[:, 0]  # [N,]
 
-        pos_count = self.positive_fraction * self.num_rcnn_deltas  # 256*0.25 = 64 at most 64
+        pos_count = int(self.positive_fraction * self.num_rcnn_deltas)  # 256*0.25 = 64 at most 64
         pos_indices = tf.random.shuffle(pos_indices)[:pos_count]
         pos_count = tf.shape(pos_indices)[0]
 

@@ -13,7 +13,7 @@ from mrcnn.rcnn import bbox_head, detection_target, mask_head
 import tensorflow as tf
 
 class MaskRCNN(tf.keras.Model, RPNTest):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, config):
         super().__init__()
         # global attributes
         self.NUM_CLASSES = num_classes  # including background
@@ -22,8 +22,8 @@ class MaskRCNN(tf.keras.Model, RPNTest):
         self.ANCHOR_FEATURE_STRIDES = [4, 8, 16, 32, 64]
 
         # first stage attributes
-        self.ANCHOR_SCALES = [8, 16, 32, 64, 128]
-        self.ANCHOR_RATIOS = [0.5, 1, 2]
+        self.ANCHOR_SCALES = config.RPN_ANCHOR_SCALES
+        self.ANCHOR_RATIOS = config.RPN_ANCHOR_RATIOS
 
         # first stage nms anchors, after nms is 2000 anchors
         self.PRN_NMS_THRESHOLD = 0.5
@@ -68,6 +68,7 @@ class MaskRCNN(tf.keras.Model, RPNTest):
 
         # stage 2 rcnn
         self.bbox_target = detection_target.ProposalTarget(
+            config=config,
             target_means=self.RPN_TARGET_MEANS,
             target_stds=self.RPN_TARGET_STDS,
             num_rcnn_deltas=self.RCNN_BATCH_SIZE,
@@ -95,7 +96,7 @@ class MaskRCNN(tf.keras.Model, RPNTest):
         :return:
         """
         if training:  # training
-            imgs, img_metas, gt_boxes, gt_class_ids, gt_masks = inputs
+            imgs, img_metas, gt_class_ids, gt_boxes, gt_masks = inputs
         else:  # inference
             imgs, img_metas = inputs
 
@@ -117,8 +118,8 @@ class MaskRCNN(tf.keras.Model, RPNTest):
         # returns the normalized coordinates y1, x1, y2, x2
         # NOTE proposals is for stage 2, no relationship with training stage 1 proposals is all foreground anchors.
         proposals_list = self.rpn_head.get_proposals(rpn_probs, rpn_deltas, img_metas)  # 2000
-        # todo note here, when training, we only selected 256 anchors to do regression,
-        #  but the proposals we generate 2000
+        # todo note here, interesting, 2000 proposals generated, when training rpn. we only need 256.
+        #  however, 2000 still used to train stage2. because coding issue, if training, then 2000 will do a selection.
 
         ###########################################  core  ###################################################
         if training:
@@ -126,10 +127,6 @@ class MaskRCNN(tf.keras.Model, RPNTest):
             # NOTE IMPORTANT HERE IS PREPARE TRAINING SECOND STAGE
             # NOTE HERE rois_list is not certain batch it maybe 192, 134 depends on positive anchors value
             # and controlled by 1:3 for pos and neg
-            # todo like stage 1 , I want to move this into rcnn loss function,
-            #  as the target build only used for loss regression.
-            #  however, we need the rois list, they are different.
-            #  cos rois_list is 2000 in inference, but in training it not certain number
             rois_list, rcnn_target_matchs_list, rcnn_target_deltas_list, rcnn_target_mask_list = \
                 self.bbox_target.build_proposal_target(
                     proposals_list, gt_boxes, gt_class_ids, gt_masks, img_metas)

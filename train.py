@@ -7,12 +7,15 @@ from datasets import my_dataset
 from mrcnn import mask_rcnn
 from config import *
 
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
+import matplotlib
+matplotlib.use('Agg')
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 print(tf.__version__)
 assert tf.__version__.startswith('2.')
-tf.random.set_seed(2019)
-np.random.seed(2019)
+tf.random.set_seed(22)
+np.random.seed(22)
 
 img_mean = (123.675, 116.28, 103.53)
 # img_std = (58.395, 57.12, 57.375)
@@ -43,8 +46,9 @@ class BalloonConfig(Config):
     DETECTION_MIN_CONFIDENCE = 0.9
 
 
+config = BalloonConfig()
 # create model
-model = mask_rcnn.MaskRCNN(num_classes=num_classes)
+model = mask_rcnn.MaskRCNN(num_classes=num_classes, config=config)
 
 
 ############################## training ###################################
@@ -56,7 +60,7 @@ def train():
     train_dataset.prepare()
 
     # create data generator
-    train_generator = data_generator(train_dataset, config=BalloonConfig(), shuffle=True,
+    train_generator = data_generator(train_dataset, config=config, shuffle=True,
                                      augmentation=None,
                                      batch_size=batch_size)
 

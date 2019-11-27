@@ -147,18 +147,18 @@ class RPN(tf.keras.Model):
         Note that num_proposals is no more than proposal_count. And different
            data in one batch may have different num_proposals.
         """
-
         # this including padded zero areas
         anchors, valid_flags = self.generator.generate_pyramid_anchors(img_metas)
 
         # [b, N, (background prob, foreground prob)], get anchor's foreground prob, [1, 369303]
         rpn_probs = rpn_probs[:, :, 1]
 
-        pad_shape = tf.cast(img_metas[..., 7:9], tf.int32).numpy()
+        pad_shape = get_batch_pad_shape(img_metas)
 
         proposals_list = [
             self._get_proposals_single_img(
-                rpn_probs[i], rpn_deltas[i], anchors, valid_flags[i], pad_shape[i]) for i in range(img_metas.shape[0])]
+                rpn_probs[i], rpn_deltas[i], anchors, valid_flags[i], pad_shape[i]) for i in
+            range(img_metas.shape[0])]
 
         return proposals_list
 

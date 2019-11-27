@@ -38,7 +38,7 @@ class MaskHead(tf.keras.Model):
 
         '''
         num_pooled_rois_list = [pooled_rois.shape[0] for pooled_rois in pooled_rois_list]
-        pooled_rois = tf.concat(num_pooled_rois_list, axis=0)
+        pooled_rois = tf.concat(pooled_rois_list, axis=0)
 
         x = self.mask_conv1(pooled_rois)
         x = self.mask_bn1(x)

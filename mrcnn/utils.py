@@ -1,6 +1,24 @@
 import tensorflow as tf
 
 
+def get_batch_pad_shape(img_metas):
+    """Takes attributes of an image and puts them in one 1D array.
+
+    image_id: An int ID of the image. Useful for debugging.
+    original_image_shape: [H, W, C] before resizing or padding.
+    image_shape: [H, W, C] after resizing and padding
+    window: (y1, x1, y2, x2) in pixels. The area of the image where the real
+            image is (excluding the padding)
+    scale: The scaling factor applied to the original image (float32)
+    active_class_ids: List of class_ids available in the dataset from which
+        the image came. Useful if training on data from multiple datasets
+        where not all classes are present in all datasets.
+    """
+
+    # 0 id, 1-3: original shape. 4-6: padded shape. 7-10: window.(y1,x1,y2,x2), 11: scale, 12: active class
+    return tf.cast(img_metas[..., 4:6], tf.int32).numpy()
+
+
 # NOTE used for trim the bboxes with 0 values. this maybe happen
 # when do some argumentations which lead boxes out of the image
 def trim_zeros(boxes, name=None):
@@ -39,7 +57,6 @@ def compute_overlaps(anchors, gt_boxes):
     x2 = tf.minimum(b1_x2, b2_x2)
 
     intersection = tf.maximum(x2 - x1, 0) * tf.maximum(y2 - y1, 0)
-
     b1_area = (b1_y2 - b1_y1) * (b1_x2 - b1_x1)
     b2_area = (b2_y2 - b2_y1) * (b2_x2 - b2_x1)
 

@@ -1,4 +1,5 @@
 from mrcnn.utils import *
+import visualize
 
 """
 for every generated anchors boxes:
@@ -94,9 +95,10 @@ class AnchorTarget:
          '''
 
         gt_boxes, _ = trim_zeros(gt_boxes)  # remove padded zero boxes, [new_N, 4]
-
         # compute overlaps gt and anchors
-        overlaps = compute_overlaps(anchors, gt_boxes)
+        overlaps = compute_overlaps(anchors, tf.cast(gt_boxes, dtype=tf.float32))
+
+        idx = tf.where(tf.greater(overlaps, 0.7))
 
         target_match = tf.zeros(anchors.shape[0], dtype=tf.int32)
 
@@ -110,6 +112,8 @@ class AnchorTarget:
 
         anchor_iou_max = tf.reduce_max(overlaps, axis=1)
         anchor_iou_argmax = tf.argmax(overlaps, axis=1)
+
+        a = tf.reduce_max(overlaps)
 
         # set negative anchors -1
         target_match = tf.where(anchor_iou_max < self.neg_iou_thr, -tf.ones(anchors.shape[0], dtype=tf.int32),

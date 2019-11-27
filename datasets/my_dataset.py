@@ -101,28 +101,3 @@ class MyDataSet(Dataset):
         # Return mask, and array of class IDs of each instance. Since we have
         # one class ID, we return an array of ones
         return mask, np.ones([mask.shape[-1]], dtype=np.int32)
-
-
-def compose_image_meta(image_id, original_image_shape, scaled_img_shape,
-                       pad_shape, scale, active_class_ids):
-    """Takes attributes of an image and puts them in one 1D array.
-
-    image_id: An int ID of the image. Useful for debugging.
-    original_image_shape: [H, W, C] before resizing or padding.
-    image_shape: [H, W, C] after resizing
-    pad_shape: [H, W, C] after padding
-    scale: The scaling factor applied to the original image (float32)
-    active_class_ids: List of class_ids available in the dataset from which
-        the image came. Useful if training on data from multiple datasets
-        where not all classes are present in all datasets.
-    """
-    meta = np.array(
-        [image_id] +  # size=1
-        list(original_image_shape) +  # size=3
-        list(scaled_img_shape) +  # size=3
-        list(pad_shape) +  # size=3
-        [scale[0]] +  # size=1 NO LONGER, I dont have time to correct this properly so take only the first element
-        list(active_class_ids)  # size=num_classes
-    )
-
-    return meta
