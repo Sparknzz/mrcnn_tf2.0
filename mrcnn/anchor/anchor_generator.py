@@ -91,7 +91,7 @@ class AnchorGenerator(object):
         widths = scales * tf.sqrt(ratios)
 
         # Enumerate shifts in feature space, [0*feature_stride]
-        # if 512 then the shifts should be [0, 1*512, 2*512...., 15*512]
+        # if 512 then the shifts should be [0, 1*64, 2*64...., 15*64]
         shifts_y = tf.multiply(tf.range(feature_shape[0]), feature_stride)
         shifts_x = tf.multiply(tf.range(feature_shape[1]), feature_stride)
 

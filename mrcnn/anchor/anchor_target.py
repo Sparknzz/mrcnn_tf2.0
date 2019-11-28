@@ -113,8 +113,6 @@ class AnchorTarget:
         anchor_iou_max = tf.reduce_max(overlaps, axis=1)
         anchor_iou_argmax = tf.argmax(overlaps, axis=1)
 
-        a = tf.reduce_max(overlaps)
-
         # set negative anchors -1
         target_match = tf.where(anchor_iou_max < self.neg_iou_thr, -tf.ones(anchors.shape[0], dtype=tf.int32),
                                 target_match)
@@ -128,14 +126,15 @@ class AnchorTarget:
 
         # set an anchor for gt regardless iou
         gt_iou_argmax = tf.argmax(overlaps, axis=0)
-        target_match = tf.compat.v1.scatter_update(target_match, gt_iou_argmax, 1)
+
+        target_match = tf.compat.v1.scatter_update(tf.Variable(target_match), gt_iou_argmax, 1)
 
         # Subsample to balance positive and negative anchors
         # Don't let positives be more than half the anchors
         ids = tf.where(tf.equal(target_match, 1))
         ids = tf.squeeze(ids, -1)
 
-        extra = ids.shape.as_list[0] - int(self.positive_fraction * self.num_rpn_deltas)
+        extra = ids.shape[0] - int(self.positive_fraction * self.num_rpn_deltas)
         if extra > 0:
             # reset the extra number to neutral
             ids = tf.random.shuffle(ids)[:extra]
@@ -144,7 +143,7 @@ class AnchorTarget:
         # same for negative
         ids = tf.where(tf.equal(target_match, -1))
         ids = tf.squeeze(ids, -1)
-        extra = ids.shape.as_list[0] - int(
+        extra = ids.shape[0] - int(
             self.num_rpn_deltas - tf.reduce_sum(tf.cast(tf.equal(target_match, 1), dtype=tf.int32)))
 
         if extra > 0:
@@ -157,9 +156,9 @@ class AnchorTarget:
         # to match the corresponding GT boxes.
         ids = tf.where(tf.equal(target_match, 1))
         pos_anchor = tf.gather_nd(anchors, ids)
-        gt_idx = tf.gather_nd(anchor_iou_argmax, ids)  # closed gt boxes index for 369303 anchors
+        gt_idx = tf.gather_nd(anchor_iou_argmax, ids)  # closed gt boxes index for 268666 anchors
 
-        gt = tf.gather_nd(gt_boxes, gt_idx)  # get closed gt boxes coordinates for ids=15
+        gt = tf.gather(gt_boxes, gt_idx)  # get closed gt boxes coordinates for ids=4
 
         # calculate deltas for gt and anchor
         target_deltas = bbox2deltas(pos_anchor, gt)

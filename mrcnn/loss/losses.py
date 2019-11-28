@@ -10,6 +10,10 @@ def rpn_class_loss(rpn_class_logits, target_matchs):
             -1=negative, 0=neutral anchor.
         rpn_class_logits: [batch_size, num_anchors, 2]. RPN classifier logits for FG/BG.
     '''
+
+    # todo note here might be very straight, cos if the positive anchor only have 1 or 2,
+    #  then the negative anchor would be much more than positive.
+
     # convert -1, +1 value to 0, 1
     anchor_class = tf.cast(tf.equal(target_matchs, 1), dtype=tf.int32)
     # Positive and Negative anchors contribute to the loss,
@@ -70,7 +74,7 @@ def rpn_bbox_loss(rpn_deltas, target_deltas, target_matchs):
         return tf.concat(outputs, axis=0)
 
     # rpn rcnn loss consists of only positive anchors
-    pos_anchor_idx = tf.where(target_matchs, 1)
+    pos_anchor_idx = tf.where(tf.equal(target_matchs, 1))
 
     pos_rpn_deltas = tf.gather_nd(rpn_deltas, pos_anchor_idx)
 
@@ -78,12 +82,12 @@ def rpn_bbox_loss(rpn_deltas, target_deltas, target_matchs):
     # however target deltas shape is [batch, num_rpn_deltas(256), 4], and only few positive, we need to trim the zeros
     # we need to trim the target deltas to same as pos_rpn deltas
 
-    batch_count = tf.reduce_sum(tf.cast(tf.where(target_matchs, 1), dtype=tf.int32), axis=1)  # [batch, 1]
+    batch_count = tf.reduce_sum(tf.cast(tf.equal(target_matchs, 1), dtype=tf.int32), axis=1)  # [batch, 1]
     batch_size = target_deltas.shape.as_list()[0]
     # do batch trim to match the rpn_deltas
     target_deltas = batch_trim(target_deltas, batch_count, batch_size)  # [batch, pos_num, 4]
 
-    loss = smooth_l1_loss(target_deltas, rpn_deltas)
+    loss = smooth_l1_loss(target_deltas, pos_rpn_deltas)
 
     loss = tf.reduce_mean(loss) if tf.size(loss) > 0 else tf.constant(0.0)
 
@@ -112,7 +116,7 @@ def rcnn_bbox_loss(target_deltas_list, target_matchs_list, rcnn_deltas_list):
     # Only positive ROIs contribute to the loss. And only the right class_id of each ROI. Get their indicies.
     positive_roi_indices = tf.where(target_matchs > 0)[:, 0]  # list of indices[]
     positive_roi_class_ids = tf.cast(tf.gather(target_matchs, positive_roi_indices), dtype=tf.int32)
-    indices = tf.stack([positive_roi_indices, positive_roi_class_ids], axis=1)
+    indices = tf.stack([tf.cast(positive_roi_indices, dtype=tf.int32), positive_roi_class_ids], axis=1)
 
     # Gather the deltas (predicted and true) that contribute to loss
     rcnn_deltas = tf.gather_nd(rcnn_deltas, indices)
@@ -135,7 +139,7 @@ def rcnn_class_loss(rcnn_target_matchs_list, rcnn_class_logits_list):
     class_logits = tf.concat(rcnn_class_logits_list, axis=0)
     class_ids = tf.cast(class_ids, tf.int32)
 
-    num_classes = rcnn_class_logits_list.shape[-1]
+    num_classes = tf.shape(rcnn_class_logits_list)[-1]
 
     loss = tf.keras.losses.categorical_crossentropy(tf.one_hot(class_ids, depth=num_classes), class_logits,
                                                     from_logits=True)

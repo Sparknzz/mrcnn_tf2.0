@@ -39,8 +39,6 @@ anchors, valid_flags = generator.generate_pyramid_anchors(batch_image_meta)
 # anchors_list = list(anchors.numpy())[258870:258875]
 gt = list(batch_gt_boxes[1])
 
-
-
 def compute_overlaps(anchors, gt_boxes):
     '''
         anchors: [N,4]
