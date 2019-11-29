@@ -31,13 +31,13 @@ from visualize import *
 
 from mrcnn.anchor import anchor_generator
 
-
 generator = anchor_generator.AnchorGenerator()
 
 anchors, valid_flags = generator.generate_pyramid_anchors(batch_image_meta)
 
 # anchors_list = list(anchors.numpy())[258870:258875]
 gt = list(batch_gt_boxes[1])
+
 
 def compute_overlaps(anchors, gt_boxes):
     '''
@@ -70,11 +70,36 @@ def compute_overlaps(anchors, gt_boxes):
 
     return overlaps
 
-overlaps = compute_overlaps(anchors, tf.cast(gt, dtype=tf.float32))
 
-idx = tf.where(tf.greater(overlaps, 0.7))
+# overlaps = compute_overlaps(anchors, tf.cast(gt, dtype=tf.float32))
 
-print(idx)
+# idx = tf.where(tf.greater(overlaps, 0.7))
+
+# print(idx)
 # all_anchor = np.concatenate([anchors_list, gt], axis=0)
 
 # draw_boxes(batch_images[0], all_anchor)
+
+
+from mrcnn import mask_rcnn
+
+model = mask_rcnn.MaskRCNN(2, config.Config())
+
+proposal_list = model([batch_images, batch_image_meta, batch_gt_class_ids, batch_gt_boxes, batch_gt_masks])
+
+proposal0 = proposal_list[1].numpy()
+
+H = 1024
+W = 1024
+proposal0 *= np.array([H, W, H, W], dtype=np.int32)
+
+gt = list(batch_gt_boxes[1])
+overlaps = compute_overlaps(proposal0, tf.cast(gt, dtype=tf.float32))
+
+idx = tf.where(tf.greater(overlaps, 0.5))
+
+print(idx)
+
+# for debugging
+if True:
+    draw_boxes(batch_images[0], proposal0)

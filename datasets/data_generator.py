@@ -4,7 +4,7 @@ from datasets.custom_transform import *
 from datasets.preprocess import *
 
 
-def data_generator(dataset, config, shuffle=True, augmentation=None, batch_size=2):
+def data_generator(dataset, config, shuffle=True, augmentation=None, batch_size=1):
     """A generator that returns data and corresponding target class ids,
     bounding box deltas, and masks.
 

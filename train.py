@@ -1,19 +1,13 @@
+from config import *
+from datasets import my_dataset
+from datasets.data_generator import *
+from mrcnn import mask_rcnn
 import os
 
-import numpy as np
-import tensorflow as tf
-from datasets.data_generator import *
-from datasets import my_dataset
-from mrcnn import mask_rcnn
-from config import *
+os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
 
-import matplotlib
-matplotlib.use('Agg')
-
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-print(tf.__version__)
 assert tf.__version__.startswith('2.')
+
 tf.random.set_seed(22)
 np.random.seed(22)
 
@@ -21,7 +15,7 @@ img_mean = (123.675, 116.28, 103.53)
 # img_std = (58.395, 57.12, 57.375)
 img_std = (1., 1., 1.)
 
-batch_size = 2
+batch_size = 1
 num_classes = 2
 
 
@@ -87,31 +81,19 @@ def train():
             # batch_gt_masks = tf.convert_to_tensor(batch_gt_masks, dtype=tf.bool)
 
             with tf.GradientTape() as tape:
-                rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss, rcnn_mask_loss = model(
-                    (batch_images, batch_image_meta, batch_gt_class_ids, batch_gt_boxes, batch_gt_masks),
-                    training=True)
+                rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss, rcnn_mask_loss = \
+                    model([batch_images, batch_image_meta, batch_gt_class_ids, batch_gt_boxes, batch_gt_masks],
+                          training=True)
 
                 total_loss = rpn_class_loss + rpn_bbox_loss + rcnn_class_loss + rcnn_bbox_loss + rcnn_mask_loss
 
             grads = tape.gradient(total_loss, model.trainable_variables)
-            optimizer.apply_gradient(zip(grads, model.trainable_variables))
+            optimizer.apply_gradients(zip(grads, model.trainable_variables))
             loss_history.append(total_loss.numpy())
 
             if batch % 10 == 0:
                 print('epoch', epoch, batch, np.mean(loss_history))
 
 
-########################### testing #################################
-# TWO THINGS ARE IMPORTANT, RPN ANCHOR REGRESSION AND ROI POOLING
-# TODO FOR RPN, NMS NEED TO BE IMPLEMENTED FOR INTERVIEW
-# proposals = model.simple_test_rpn(img, img_meta)
-# STAGE 2 TESTING
-# after proposals generated, next step is to cut roi region for roi pooling
-# res = model.simple_test_bboxes(img, img_meta, proposals)
-
-# visualize.display_instances(img, res['rois'], res['class_ids'], scores=res['scores'])
-# plt.savefig('image_demo_ckpt.png')
-
-
-##########################################################################
-train()
+if __name__ == '__main__':
+    train()

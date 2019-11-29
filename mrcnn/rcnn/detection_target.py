@@ -91,8 +91,8 @@ class ProposalTarget(object):
 
         # 2. calculate overlaps bet gt and proposals
         overlaps = compute_overlaps(proposals, gt_boxes)
-        # returns [num_proposals, gt] matrix
 
+        # returns [num_proposals, gt] matrix
         proposal_iou_max = tf.reduce_max(overlaps, axis=1)
         proposal_iou_argmax = tf.argmax(overlaps, axis=1)
 

@@ -109,8 +109,12 @@ def rcnn_bbox_loss(target_deltas_list, target_matchs_list, rcnn_deltas_list):
         target_matchs_list: list of [num_rois]. Integer class IDs.
         rcnn_deltas_list: list of [num_rois, num_classes, (dy, dx, log(dh), log(dw))]
     '''
-    target_deltas = tf.concat(target_deltas_list, axis=0)
     target_matchs = tf.concat(target_matchs_list, axis=0)
+    # as target_deltas padded to 256. so need to removed padded target_match
+    pos_anchor_idx = tf.where(tf.greater(target_matchs, 0))
+    target_deltas = tf.concat(target_deltas_list, axis=0)
+    pos_target_deltas = tf.gather_nd(target_deltas, pos_anchor_idx)
+
     rcnn_deltas = tf.concat(rcnn_deltas_list, axis=0)
 
     # Only positive ROIs contribute to the loss. And only the right class_id of each ROI. Get their indicies.
@@ -122,7 +126,7 @@ def rcnn_bbox_loss(target_deltas_list, target_matchs_list, rcnn_deltas_list):
     rcnn_deltas = tf.gather_nd(rcnn_deltas, indices)
 
     # smooth l1 loss
-    loss = smooth_l1_loss(target_deltas, rcnn_deltas)
+    loss = smooth_l1_loss(pos_target_deltas, rcnn_deltas)
 
     loss = tf.reduce_mean(loss) if tf.size(loss) > 0 else tf.constant(0.0)
 
@@ -153,32 +157,32 @@ def rcnn_mask_loss(target_mask_list, target_class_ids_list, mrcnn_mask_list):
     """Mask binary cross-entropy loss for the masks head.
     Params:
     -----------------------------------------------------------
-        target_masks: [batch, num_rois, height, width].
+        target_masks_list: [(num_rois, height, width),()....].
                         A float32 tensor of values 0 or 1. Uses zero padding to fill array.
-        target_class_ids: [batch*num_rois]. Integer class IDs. Zero padded.
-        pred_masks: [batch*proposals, height, width, num_classes] float32 tensor
-                        with values from 0 to 1.
+        target_class_ids_list: [num_rois,...]. Integer class IDs. Zero padded.
+        mrcnn_mask_list : [(num_rois, H, W, num_classes),()...]
     """
     target_masks = tf.concat(target_mask_list, axis=0)
     target_class_ids = tf.concat(target_class_ids_list, axis=0)
     pred_masks = tf.concat(mrcnn_mask_list, axis=0)
 
     # Reshape for simplicity. Merge first two dimensions into one.
-    target_class_ids = tf.reshape(target_class_ids, (-1,))
-    # todo to check the dimens
-    mask_shape = tf.shape(target_masks)  # n, c, h, w
-    target_masks = tf.reshape(target_masks, (-1, mask_shape[2], mask_shape[3]))
-    # b, n, h, w, c
+    target_class_ids = tf.reshape(target_class_ids, (-1,)) # 512
+
+    mask_shape = tf.shape(target_masks)  # batch*num_rois, h, w
+    target_masks = tf.reshape(target_masks, (-1, mask_shape[1], mask_shape[2]))
+
+    # num_rois, h, w, num_classes
     pred_shape = tf.shape(pred_masks)
-    pred_masks = tf.reshape(pred_masks, (-1, pred_shape[2], pred_shape[3], pred_shape[4]))
+    pred_masks = tf.reshape(pred_masks, (-1, pred_shape[1], pred_shape[2], pred_shape[3]))
 
     # Permute predicted masks to [N, num_classes, height, width]
     pred_masks = tf.transpose(pred_masks, [0, 3, 1, 2])
 
     # Only positive ROIs contribute to the loss. And only the class specific mask of each ROI.
-    positive_roi_idx = tf.where(target_class_ids > 0)[:0]
+    positive_roi_idx = tf.where(target_class_ids > 0)[:, 0]
     positive_roi_class_ids = tf.cast(tf.gather(target_class_ids, positive_roi_idx), dtype=tf.int32)
-    indices = tf.stack([positive_roi_idx, positive_roi_class_ids], axis=1)
+    indices = tf.stack([tf.cast(positive_roi_idx, dtype=tf.int32), positive_roi_class_ids], axis=1)
 
     # Gather the masks (predicted and true) that contribute to loss
     y_true = tf.gather(target_masks, positive_roi_idx)
@@ -187,6 +191,6 @@ def rcnn_mask_loss(target_mask_list, target_class_ids_list, mrcnn_mask_list):
     # Compute binary cross entropy.  If no positive ROIs, then return 0.
     loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=y_true, logits=y_pred)
 
-    loss = tf.reduce_mean(loss) if loss.size() > 0 else tf.constant(0.0, dtype=tf.float32)
+    loss = tf.reduce_mean(loss) if tf.size(loss) > 0 else tf.constant(0.0, dtype=tf.float32)
 
     return loss

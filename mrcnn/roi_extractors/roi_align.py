@@ -94,7 +94,7 @@ class PyramidROIAlign(tf.keras.layers.Layer):
             # which is how it's done in tf.crop_and_resize()
             # Result: [batch * num_rois, pool_height, pool_width, channels]
             pooled_rois.append(tf.image.crop_and_resize(
-                feature_maps_list[i], level_rois, level_roi_indices, self.pool_shape,
+                feature_maps_list[i], level_rois, level_roi_indices, [self.pool_shape, self.pool_shape],
                 method='bilinear'))
 
         # now we already got each level's pooled_rois, however, it is not corresponding to original rois_list

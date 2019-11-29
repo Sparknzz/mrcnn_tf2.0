@@ -8,14 +8,16 @@ from mrcnn.backbones import resnet
 from mrcnn.fpn import fpn
 from mrcnn.roi_extractors import roi_align
 from mrcnn.rpn import rpn
-from mrcnn.test_heads import *
 from mrcnn.rcnn import bbox_head, detection_target, mask_head
 import tensorflow as tf
 
-class MaskRCNN(tf.keras.Model, RPNTest):
+
+class MaskRCNN(tf.keras.Model):
     def __init__(self, num_classes, config):
         super().__init__()
         # global attributes
+        self.config = config
+
         self.NUM_CLASSES = num_classes  # including background
         self.RPN_TARGET_MEANS = [0, 0, 0, 0]
         self.RPN_TARGET_STDS = [0.1, 0.1, 0.2, 0.2]
@@ -62,9 +64,8 @@ class MaskRCNN(tf.keras.Model, RPNTest):
             pos_iou_thr=self.RPN_POS_IOU_THR,
             neg_iou_thr=self.RPN_NEG_IOU_THR, )
 
-        self.roi_align = roi_align.PyramidROIAlign(
-            pool_shape=self.POOL_SIZE,
-            name='pyramid_roi_align')
+        self.det_roi_align = roi_align.PyramidROIAlign(pool_shape=config.POOL_SIZE, name='det_roi_align')
+        self.mask_roi_align = roi_align.PyramidROIAlign(pool_shape=config.MASK_POOL_SIZE, name='mask_roi_align')
 
         # stage 2 rcnn
         self.bbox_target = detection_target.ProposalTarget(
@@ -118,9 +119,10 @@ class MaskRCNN(tf.keras.Model, RPNTest):
         # returns the normalized coordinates y1, x1, y2, x2
         # NOTE proposals is for stage 2, no relationship with training stage 1 proposals is all foreground anchors.
         proposals_list = self.rpn_head.get_proposals(rpn_probs, rpn_deltas, img_metas)  # 2000
-        # todo note here, interesting, 2000 proposals generated, when training rpn. we only need 256.
-        #  however, 2000 still used to train stage2. because coding issue, if training, then 2000 will do a selection.
 
+        # debugging proposals
+        # if True:
+        # return proposals_list
         ###########################################  core  ###################################################
         if training:
             # get target value for these proposal target label and target delta
@@ -136,14 +138,18 @@ class MaskRCNN(tf.keras.Model, RPNTest):
         #######################################################################################################
 
         # rois_list only contains coordinates, rcnn_feature_maps save the 4 features data
-        pooled_regions_list = self.roi_align(
+        # note for detection and mask, we use different roi size.
+        det_pooled_regions_list = self.det_roi_align(
+            (rois_list, rcnn_feature_maps, img_metas), training=training)
+
+        mask_pooled_regions_list = self.mask_roi_align(
             (rois_list, rcnn_feature_maps, img_metas), training=training)
 
         #############################################  stage 2  ##############################################
-        rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = self.bbox_head(pooled_regions_list,
+        rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = self.bbox_head(det_pooled_regions_list,
                                                                                    training=training)
         # mask branch
-        mrcnn_mask_list = self.mask_head(pooled_regions_list)
+        mrcnn_mask_list = self.mask_head(mask_pooled_regions_list)
 
         if training:
             # note for rpn training, the rpn_deltas is all anchors deltas.
