@@ -29,6 +29,7 @@ def rpn_class_loss(rpn_class_logits, target_matchs):
     loss = tf.keras.losses.categorical_crossentropy(tf.one_hot(anchor_class, depth=num_classes), rpn_class_logits,
                                                     from_logits=True)
 
+    loss = tf.reduce_mean(loss) if tf.size(loss) > 0 else tf.constant(0.0)
     return loss
 
 
@@ -99,9 +100,8 @@ def rcnn_bbox_loss(target_deltas_list, target_matchs_list, rcnn_deltas_list):
     note: this is only used in training, so target_matches_list depends on the target, maybe 256 default.
     but actually it is not certain value. maybe 192 or 134  etc. including pos and neg.
 
-    rcnn_deltas_list: either training or inference, it would be there. in training stage, same as target.
-    in inference it would be 2000 always. [2000 * num_class, 4]
-    so have to figure out which pooled_roi and which class_id it coresponding.
+    rcnn_deltas_list: padded 256 in total for training use. maybe 0 pos_anchor.
+    but need to figure out which pooled_roi and which class_id it cooresponding.
 
     Args
     ---
@@ -110,17 +110,16 @@ def rcnn_bbox_loss(target_deltas_list, target_matchs_list, rcnn_deltas_list):
         rcnn_deltas_list: list of [num_rois, num_classes, (dy, dx, log(dh), log(dw))]
     '''
     target_matchs = tf.concat(target_matchs_list, axis=0)
-    # as target_deltas padded to 256. so need to removed padded target_match
-    pos_anchor_idx = tf.where(tf.greater(target_matchs, 0))
-    target_deltas = tf.concat(target_deltas_list, axis=0)
-    pos_target_deltas = tf.gather_nd(target_deltas, pos_anchor_idx)
+    pos_anchor_idx = tf.where(tf.greater(target_matchs, 0))[:,0]
 
-    rcnn_deltas = tf.concat(rcnn_deltas_list, axis=0)
+    target_deltas = tf.concat(target_deltas_list, axis=0)
+    pos_target_deltas = tf.gather(target_deltas, pos_anchor_idx)
+
+    rcnn_deltas = tf.concat(rcnn_deltas_list, axis=0) # 512
 
     # Only positive ROIs contribute to the loss. And only the right class_id of each ROI. Get their indicies.
-    positive_roi_indices = tf.where(target_matchs > 0)[:, 0]  # list of indices[]
-    positive_roi_class_ids = tf.cast(tf.gather(target_matchs, positive_roi_indices), dtype=tf.int32)
-    indices = tf.stack([tf.cast(positive_roi_indices, dtype=tf.int32), positive_roi_class_ids], axis=1)
+    positive_roi_class_ids = tf.cast(tf.gather(target_matchs, pos_anchor_idx), dtype=tf.int32)
+    indices = tf.stack([tf.cast(pos_anchor_idx, dtype=tf.int32), positive_roi_class_ids], axis=1)
 
     # Gather the deltas (predicted and true) that contribute to loss
     rcnn_deltas = tf.gather_nd(rcnn_deltas, indices)

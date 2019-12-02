@@ -29,7 +29,7 @@ batch_images, batch_image_meta, batch_gt_class_ids, batch_gt_boxes, batch_gt_mas
 
 from visualize import *
 
-from mrcnn.anchor import anchor_generator
+from mrcnn.rpn import anchor_generator
 
 generator = anchor_generator.AnchorGenerator()
 

@@ -11,7 +11,7 @@ class PyramidROIAlign(tf.keras.layers.Layer):
             pool_shape: (height, width) of the output pooled regions.
                 Example: (7, 7)
         '''
-        super().__init__(kwargs)
+        super(PyramidROIAlign, self).__init__(**kwargs)
         self.pool_shape = pool_shape
 
     def call(self, inputs):
@@ -28,7 +28,7 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         # [Tensor(2000,(y1,x1,y2,x2)),...] normalized coordinates feature maps [C2,C3,C4,C5,C6]
         rois_list, feature_maps_list, img_metas = inputs
 
-        pad_shapes = tf.cast(img_metas[:, 7:9], dtype=tf.float32).numpy()
+        pad_shapes = tf.cast(img_metas[:, 4:6], dtype=tf.float32).numpy()
 
         pad_areas = pad_shapes[:, 0] * pad_shapes[:, 1]  # [batch, h*w]
 
@@ -47,7 +47,7 @@ class PyramidROIAlign(tf.keras.layers.Layer):
         rois = tf.concat(rois_list, axis=0)
 
         # todo need to be checked here, cos nan value will impact tf.image.crop_resize()
-        rois = tf.where(tf.math.is_nan(rois), tf.zeros_like(rois), rois)
+        # rois = tf.where(tf.math.is_nan(rois), tf.zeros_like(rois), rois)
 
         # 1. assign each roi to a level in pyramid based on ROI area
         y1, x1, y2, x2 = tf.split(rois, 4, axis=-1)

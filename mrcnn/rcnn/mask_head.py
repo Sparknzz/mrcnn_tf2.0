@@ -22,8 +22,7 @@ class MaskHead(tf.keras.Model):
         self.mask_conv4 = layers.Conv2D(256, (3, 3), padding="same", name='mrcnn_mask_conv4')
         self.mask_bn4 = layers.BatchNormalization(name='mrcnn_mask_bn4')
 
-        self.mask_deconv = layers.Conv2DTranspose(256, (2, 2), strides=2, activation="relu",
-                                                  name="mrcnn_mask_deconv")  # 14,14,256
+        self.mask_deconv = layers.Conv2DTranspose(256, (2, 2), strides=2, activation="relu", name="mrcnn_mask_deconv")
         self.mask_probs = layers.Conv2D(self.num_classes, (1, 1), strides=1, activation="sigmoid", name="mrcnn_mask")
 
         # loss
@@ -41,19 +40,19 @@ class MaskHead(tf.keras.Model):
         pooled_rois = tf.concat(pooled_rois_list, axis=0)
 
         x = self.mask_conv1(pooled_rois)
-        x = self.mask_bn1(x)
+        x = self.mask_bn1(x, training=training)
         x = tf.nn.relu(x)
 
         x = self.mask_conv2(x)
-        x = self.mask_bn2(x)
+        x = self.mask_bn2(x, training=training)
         x = tf.nn.relu(x)
 
         x = self.mask_conv3(x)
-        x = self.mask_bn3(x)
+        x = self.mask_bn3(x, training=training)
         x = tf.nn.relu(x)
 
         x = self.mask_conv4(x)
-        x = self.mask_bn4(x)
+        x = self.mask_bn4(x, training=training)
         x = tf.nn.relu(x)
 
         x = self.mask_deconv(x)

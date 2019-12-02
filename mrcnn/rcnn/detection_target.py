@@ -109,6 +109,11 @@ class ProposalTarget(object):
         neg_count = tf.cast(r * tf.cast(pos_count, tf.float32), tf.int32) - pos_count
         neg_indices = tf.random.shuffle(neg_indices)[:neg_count]  # 256 - 64 = 192  at most 192
 
+        # #debugging
+        # if True:
+        #     print('rcnn pos num : ' + str(pos_count))
+        #     print('rcnn neg num : ' + str(neg_count))
+
         # 5. gather selected rois based on removed redundant pos/neg indices
         positive_rois = tf.gather(proposals, pos_indices)
         negative_rois = tf.gather(proposals, neg_indices)

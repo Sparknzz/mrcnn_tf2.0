@@ -7,20 +7,17 @@ FRN model for tf Keras.
 '''
 
 import tensorflow as tf
-import os
-
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
 
 
 class FPN(tf.keras.Model):
-    def __init__(self, name='fpn', out_channels=256):
+    def __init__(self, out_channels=256, **kwargs):
         '''
         Feature Pyramid Networks
         Attributes:
             out_channels: int. the channels of pyramid feature maps.
         '''
 
-        super().__init__()
+        super(FPN, self).__init__(**kwargs)
 
         self.out_channels = out_channels
 

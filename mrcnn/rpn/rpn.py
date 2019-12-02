@@ -1,5 +1,4 @@
-from mrcnn.anchor import anchor_generator
-from mrcnn.anchor import anchor_target
+from mrcnn.rpn import anchor_generator, anchor_target
 from mrcnn.utils import *
 from mrcnn.loss import losses
 
@@ -15,7 +14,7 @@ class RPN(tf.keras.Model):
                  nms_threshold=0.7,
                  positive_fraction=0.33,
                  pos_iou_thr=0.7,
-                 neg_iou_thr=0.3, ):
+                 neg_iou_thr=0.3, **kwargs):
         '''
         Network head of Region Proposal Network.
 
@@ -38,7 +37,7 @@ class RPN(tf.keras.Model):
             neg_iou_thr: float.
         '''
 
-        super().__init__()
+        super(RPN, self).__init__(**kwargs)
 
         self.proposal_count = proposal_count
         self.nms_threshold = nms_threshold
@@ -74,7 +73,7 @@ class RPN(tf.keras.Model):
         self.rpn_class_loss = losses.rpn_class_loss
         self.rpn_bbox_loss = losses.rpn_bbox_loss
 
-    def call(self, feature_maps):
+    def call(self, feature_maps, **kwargs):
         '''
         Args
         inputs: [batch_size, feat_map_height, feat_map_width, channels]

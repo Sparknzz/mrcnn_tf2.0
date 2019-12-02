@@ -12,8 +12,9 @@ class BBoxHead(tf.keras.Model):
                  min_confidence=0.7,
                  nms_threshold=0.3,
                  max_instances=100,
-                 **kwags):
-        super(BBoxHead, self).__init__(**kwags)
+                 fc_layers_size=1024,
+                 **kwargs):
+        super(BBoxHead, self).__init__(**kwargs)
 
         self.num_classes = num_classes
         self.pool_size = tuple(pool_size)
@@ -22,13 +23,13 @@ class BBoxHead(tf.keras.Model):
         self.min_confidence = min_confidence
         self.nms_threshold = nms_threshold
         self.max_instances = max_instances
-
-        self.rcnn_class_conv1 = layers.Conv2D(1024, self.pool_size,
+        self.fc_layers_size = fc_layers_size
+        self.rcnn_class_conv1 = layers.Conv2D(fc_layers_size, self.pool_size,
                                               padding='valid', name='rcnn_class_conv1')
 
         self.rcnn_class_bn1 = layers.BatchNormalization(name='rcnn_class_bn1')
 
-        self.rcnn_class_conv2 = layers.Conv2D(1024, (1, 1),
+        self.rcnn_class_conv2 = layers.Conv2D(fc_layers_size, (1, 1),
                                               name='rcnn_class_conv2')
 
         self.rcnn_class_bn2 = layers.BatchNormalization(name='rcnn_class_bn2')
@@ -40,11 +41,9 @@ class BBoxHead(tf.keras.Model):
         self.rcnn_class_loss = losses.rcnn_class_loss
         self.rcnn_bbox_loss = losses.rcnn_bbox_loss
 
-    def call(self, pooled_rois_list, training=True):
+    def call(self, pooled_rois_list, training=True, **kwargs):
         '''
-           Args
-           ---
-               pooled_rois_list: List of [num_rois, pool_size, pool_size, channels]
+            pooled_rois_list: List of [num_rois, pool_size, pool_size, channels]
 
            Returns
            ---

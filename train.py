@@ -4,19 +4,12 @@ from datasets.data_generator import *
 from mrcnn import mask_rcnn
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '2,3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 assert tf.__version__.startswith('2.')
 
 tf.random.set_seed(22)
 np.random.seed(22)
-
-img_mean = (123.675, 116.28, 103.53)
-# img_std = (58.395, 57.12, 57.375)
-img_std = (1., 1., 1.)
-
-batch_size = 1
-num_classes = 2
 
 
 class BalloonConfig(Config):
@@ -28,7 +21,7 @@ class BalloonConfig(Config):
 
     # We use a GPU with 12GB memory, which can fit two data.
     # Adjust down if you use a smaller GPU.
-    IMAGES_PER_GPU = 2
+    IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
     NUM_CLASSES = 1 + 1  # Background + balloon
@@ -42,7 +35,7 @@ class BalloonConfig(Config):
 
 config = BalloonConfig()
 # create model
-model = mask_rcnn.MaskRCNN(num_classes=num_classes, config=config)
+model = mask_rcnn.MaskRCNN(num_classes=config.NUM_CLASSES, config=config)
 
 
 ############################## training ###################################
@@ -56,7 +49,7 @@ def train():
     # create data generator
     train_generator = data_generator(train_dataset, config=config, shuffle=True,
                                      augmentation=None,
-                                     batch_size=batch_size)
+                                     batch_size=config.BATCH_SIZE)
 
     # Validation dataset
     # dataset_train = my_dataset.MyDataSet()
@@ -85,7 +78,12 @@ def train():
                     model([batch_images, batch_image_meta, batch_gt_class_ids, batch_gt_boxes, batch_gt_masks],
                           training=True)
 
+                tape.watch(model.trainable_variables)
+
+                # print(model.summary())
                 total_loss = rpn_class_loss + rpn_bbox_loss + rcnn_class_loss + rcnn_bbox_loss + rcnn_mask_loss
+
+                print('{}....{}....{}....{}....{}....{}'.format(rpn_class_loss, rpn_bbox_loss, rcnn_class_loss, rcnn_bbox_loss, rcnn_mask_loss, total_loss))
 
             grads = tape.gradient(total_loss, model.trainable_variables)
             optimizer.apply_gradients(zip(grads, model.trainable_variables))

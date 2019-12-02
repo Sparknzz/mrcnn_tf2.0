@@ -134,6 +134,10 @@ class AnchorTarget:
         ids = tf.where(tf.equal(target_match, 1))
         ids = tf.squeeze(ids, -1)
 
+        # debug
+        # if True:
+        #     print('rpn pos ids num : ' + str(ids.shape[0]))
+
         extra = ids.shape[0] - int(self.positive_fraction * self.num_rpn_deltas)
         if extra > 0:
             # reset the extra number to neutral
@@ -143,6 +147,11 @@ class AnchorTarget:
         # same for negative
         ids = tf.where(tf.equal(target_match, -1))
         ids = tf.squeeze(ids, -1)
+
+        # # debug
+        # if True:
+        #     print('rpn neg ids num : ' + str(ids.shape[0]))
+
         extra = ids.shape[0] - int(
             self.num_rpn_deltas - tf.reduce_sum(tf.cast(tf.equal(target_match, 1), dtype=tf.int32)))
 

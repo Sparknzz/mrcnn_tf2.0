@@ -62,10 +62,10 @@ class MaskRCNN(tf.keras.Model):
             target_stds=self.RPN_TARGET_STDS,
             positive_fraction=self.RPN_POS_FRAC,
             pos_iou_thr=self.RPN_POS_IOU_THR,
-            neg_iou_thr=self.RPN_NEG_IOU_THR, )
+            neg_iou_thr=self.RPN_NEG_IOU_THR, name='rpn_head')
 
-        self.det_roi_align = roi_align.PyramidROIAlign(pool_shape=config.POOL_SIZE, name='det_roi_align')
-        self.mask_roi_align = roi_align.PyramidROIAlign(pool_shape=config.MASK_POOL_SIZE, name='mask_roi_align')
+        self.det_roi_align = roi_align.PyramidROIAlign(config.POOL_SIZE, name='det_roi_align')
+        self.mask_roi_align = roi_align.PyramidROIAlign(config.MASK_POOL_SIZE, name='mask_roi_align')
 
         # stage 2 rcnn
         self.bbox_target = detection_target.ProposalTarget(
@@ -85,10 +85,11 @@ class MaskRCNN(tf.keras.Model):
             target_stds=(0.1, 0.1, 0.2, 0.2),
             min_confidence=0.7,
             nms_threshold=0.3,
-            max_instances=100, )
+            fc_layers_size=self.config.FPN_CLASSIF_FC_LAYERS_SIZE,
+            max_instances=100, name='bbox_head')
 
         # stage 2 mask branch
-        self.mask_head = mask_head.MaskHead(self.NUM_CLASSES, )
+        self.mask_head = mask_head.MaskHead(self.NUM_CLASSES, name='mask_head')
 
     def call(self, inputs, training=True):
         """
@@ -139,17 +140,15 @@ class MaskRCNN(tf.keras.Model):
 
         # rois_list only contains coordinates, rcnn_feature_maps save the 4 features data
         # note for detection and mask, we use different roi size.
-        det_pooled_regions_list = self.det_roi_align(
-            (rois_list, rcnn_feature_maps, img_metas), training=training)
+        det_pooled_regions_list = self.det_roi_align([rois_list, rcnn_feature_maps, img_metas])
 
-        mask_pooled_regions_list = self.mask_roi_align(
-            (rois_list, rcnn_feature_maps, img_metas), training=training)
+        mask_pooled_regions_list = self.mask_roi_align([rois_list, rcnn_feature_maps, img_metas])
 
         #############################################  stage 2  ##############################################
-        rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = self.bbox_head(det_pooled_regions_list,
-                                                                                   training=training)
+        rcnn_class_logits_list, rcnn_probs_list, rcnn_deltas_list = \
+            self.bbox_head(det_pooled_regions_list, training=training)
         # mask branch
-        mrcnn_mask_list = self.mask_head(mask_pooled_regions_list)
+        mrcnn_mask_list = self.mask_head(mask_pooled_regions_list, training=training)
 
         if training:
             # note for rpn training, the rpn_deltas is all anchors deltas.
